@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Welcome</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; color: #0f172a">
+        <h2>Welcome to <%= appName %></h2>
+        <p>Hi <strong><%= member.full_name || member.email %></strong>,</p>
+        <p>Your "<%= appName %>" account has been created.</p>
+        <ul>
+            <li>Email: <%= user.email %></li>
+            <li>Username: <%= user.username %></li>
+            <li>Password: <%= password %></li>
+            <% if (roleName) { %>
+            <li>Role: <%= roleName %></li>
+            <% } %> <% if (member.department_id) { %>
+            <li>Department ID: <%= member.department_id %></li>
+            <% } %>
+        </ul>
+        <p>
+            Please <a href="<%= appUrl %>/login" target="_blank">log in</a> and
+            change your password as soon as possible.
+        </p>
+        <p>If you have questions, please contact your admin.</p>
+        <p>Thanks,<br />The <%= appName %> Team</p>
+    </body>
+</html>

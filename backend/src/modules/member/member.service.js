@@ -1,0 +1,447 @@
+import bcrypt from "bcrypt";
+import crypto from "crypto";
+import fs from "fs/promises";
+import path, { dirname } from "path";
+import { fileURLToPath } from "url";
+import { Sequelize, QueryTypes } from "sequelize";
+import sharp from "sharp";
+import initModels from "../../models/index.js";
+import { env, logger } from "../../config/index.js";
+import { getEmailQueue } from "../../queues/email.queue.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const emailTemplateDir = path.resolve(__dirname, "../../views/emails");
+const uploadRoot = path.resolve(__dirname, "../../../upload");
+
+export default class MemberService {
+    constructor(db) {
+        this.sequelize =
+            db?.sequelize ||
+            new Sequelize(env.DB_NAME, env.DB_USER, env.DB_PASS, {
+                host: env.DB_HOST,
+                port: env.DB_PORT,
+                dialect: env.DB_DIALECT,
+                logging: false,
+            });
+
+        const models = initModels(this.sequelize);
+        this.Member = models.Member;
+        this.User = models.User;
+        this.UserRole = models.UserRole;
+        this.Role = models.Role;
+    }
+
+    normalizeAvatarPath(member) {
+        if (!member || !member.avatar_path || !env.BASE_URL) return member;
+        if (/^https?:\/\//i.test(member.avatar_path)) return member;
+        const base = String(env.BASE_URL).replace(/\/$/, "");
+        const suffix = member.avatar_path.startsWith("/")
+            ? member.avatar_path
+            : `/${member.avatar_path}`;
+        member.avatar_path = `${base}${suffix}`;
+        return member;
+    }
+
+    async enqueueEmailJob(to, subject, template, context = {}) {
+        const queue = getEmailQueue();
+        if (!queue) return;
+        const payload = {
+            to,
+            subject,
+            template,
+            context,
+            from: env.SMTP_FROM || env.SMTP_USER,
+            createdAt: new Date().toISOString(),
+        };
+        await queue.add("send-email", payload, {
+            attempts: 3,
+            backoff: { type: "exponential", delay: 3000 },
+            removeOnComplete: true,
+            removeOnFail: false,
+        });
+    }
+
+    async list({
+        page = 1,
+        limit = 25,
+        sortBy = "name",
+        sortOrder = "asc",
+        search = "",
+    } = {}) {
+        const safePage = Math.max(Number(page) || 1, 1);
+        const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 200);
+        const offset = (safePage - 1) * safeLimit;
+        const orderDir =
+            String(sortOrder).toLowerCase() === "desc" ? "DESC" : "ASC";
+        const sortMap = {
+            name: "m.full_name",
+            designation: "m.designation",
+            department: "d.name",
+            role: "MIN(r.name)",
+        };
+        const orderBy = sortMap[sortBy] || sortMap.name;
+        const trimmedSearch = String(search || "").trim();
+        const likeSearch = trimmedSearch ? `%${trimmedSearch}%` : null;
+        const whereClause = trimmedSearch
+            ? `WHERE (
+                m.full_name LIKE :search
+                OR m.designation LIKE :search
+                OR m.phone LIKE :search
+                OR m.email LIKE :search
+                OR d.name LIKE :search
+                OR r.name LIKE :search
+                OR r.slug LIKE :search
+            )`
+            : "";
+
+        const rows =
+            (await this.sequelize.query(
+                `
+            SELECT
+                m.*,
+                u.id AS user_id,
+                u.username AS user_username,
+                u.email AS user_email,
+                u.department_id AS user_department_id,
+                GROUP_CONCAT(DISTINCT r.name) AS role_names,
+                GROUP_CONCAT(DISTINCT r.slug) AS role_slugs,
+                d.name AS department_name
+            FROM members m
+            LEFT JOIN users u ON u.member_id = m.id AND u.deleted_at IS NULL
+            LEFT JOIN user_roles ur ON ur.user_id = u.id
+            LEFT JOIN roles r ON r.id = ur.role_id 
+            LEFT JOIN departments d ON d.id = m.department_id
+            ${whereClause}
+            GROUP BY m.id, u.id
+            ORDER BY ${orderBy} ${orderDir}, m.full_name ASC
+            LIMIT :limit OFFSET :offset
+            `,
+                {
+                    type: QueryTypes.SELECT,
+                    replacements: {
+                        limit: safeLimit,
+                        offset,
+                        ...(likeSearch ? { search: likeSearch } : {}),
+                    },
+                },
+            )) || [];
+
+        const [{ total = 0 } = {}] =
+            (await this.sequelize.query(
+                `
+            SELECT COUNT(DISTINCT m.id) AS total
+            FROM members m
+            LEFT JOIN departments d ON d.id = m.department_id
+            LEFT JOIN users u ON u.member_id = m.id AND u.deleted_at IS NULL
+            LEFT JOIN user_roles ur ON ur.user_id = u.id
+            LEFT JOIN roles r ON r.id = ur.role_id
+            ${whereClause}
+            `,
+                {
+                    type: QueryTypes.SELECT,
+                    replacements: likeSearch ? { search: likeSearch } : {},
+                },
+            )) || [];
+
+        return {
+            rows: rows.map((row) => this.normalizeAvatarPath(row)),
+            total: Number(total) || 0,
+            page: safePage,
+            limit: safeLimit,
+        };
+    }
+
+    async getById(id) {
+        console.log("Member ID: ", id);
+        const [member] =
+            (await this.sequelize.query(
+                `
+            SELECT
+                m.*,
+                u.id AS user_id,
+                u.username AS user_username,
+                u.email AS user_email,
+                u.department_id AS user_department_id,
+                GROUP_CONCAT(DISTINCT r.name) AS role_names,
+                GROUP_CONCAT(DISTINCT r.slug) AS role_slugs,
+                d.name AS department_name
+            FROM members m
+            LEFT JOIN users u ON u.member_id = m.id AND u.deleted_at IS NULL
+            LEFT JOIN user_roles ur ON ur.user_id = u.id
+            LEFT JOIN roles r ON r.id = ur.role_id 
+            LEFT JOIN departments d ON d.id = m.department_id
+            WHERE m.id = :id
+            GROUP BY m.id, u.id
+            LIMIT 1
+            `,
+                { type: QueryTypes.SELECT, replacements: { id } },
+            )) || [];
+
+        console.log("Fetched Member: ", member);
+        if (!member) {
+            const err = new Error("Member not found");
+            err.statusCode = 404;
+            throw err;
+        }
+        return this.normalizeAvatarPath(member);
+    }
+
+    async create(payload, avatarFile = null) {
+        const t = await this.sequelize.transaction();
+        try {
+            const {
+                full_name,
+                email,
+                phone,
+                secondary_phone,
+                whatsapp,
+                designation,
+                department_id,
+                username,
+                role_id,
+            } = payload;
+
+            const member = await this.Member.create(
+                {
+                    full_name,
+                    email,
+                    phone,
+                    secondary_phone: secondary_phone || null,
+                    whatsapp: whatsapp || null,
+                    designation: designation || null,
+                    department_id: department_id || null,
+                },
+                { transaction: t },
+            );
+
+            const passwordSeed = "Password@123";
+            const password_hash = await bcrypt.hash(String(passwordSeed), 10);
+
+            const user = await this.User.create(
+                {
+                    member_id: member.id,
+                    username,
+                    email,
+                    password_hash,
+                    department_id: department_id || null,
+                    is_active: 1,
+                },
+                { transaction: t },
+            );
+
+            let roleName = "";
+            if (role_id) {
+                const role = await this.Role.findByPk(role_id);
+                roleName = role?.name || role?.slug || "";
+                await this.UserRole.destroy({
+                    where: { user_id: user.id },
+                    transaction: t,
+                });
+                await this.UserRole.create(
+                    {
+                        user_id: user.id,
+                        role_id,
+                        department_id: department_id || 0,
+                    },
+                    { transaction: t },
+                );
+            }
+
+            if (avatarFile) {
+                await this.applyAvatar(member, avatarFile, t);
+            }
+            await t.commit();
+            // enqueue email job (fire-and-forget)
+            const memberPayload = member.toJSON();
+            const userPayload = user.toJSON();
+            this.enqueueEmailJob(
+                memberPayload.email,
+                `Welcome to ${env.APP_NAME}`,
+                path.join(emailTemplateDir, "member-welcome.ejs"),
+                {
+                    member: memberPayload,
+                    user: userPayload,
+                    password: passwordSeed,
+                    roleName,
+                    appName: env.APP_NAME,
+                    appUrl: env.APP_URL,
+                },
+            ).catch((err) => logger.error({ err }, "Failed to enqueue email"));
+            this.normalizeAvatarPath(member);
+            return member;
+        } catch (err) {
+            await t.rollback();
+            throw err;
+        }
+    }
+
+    async update(id, payload, avatarFile = null) {
+        const t = await this.sequelize.transaction();
+        try {
+            const member = await this.Member.findByPk(id, { transaction: t });
+            if (!member) {
+                const err = new Error("Member not found");
+                err.statusCode = 404;
+                throw err;
+            }
+
+            const user = await this.User.findOne({
+                where: { member_id: id, deleted_at: null },
+                transaction: t,
+            });
+
+            const {
+                full_name,
+                email,
+                phone,
+                secondary_phone,
+                whatsapp,
+                designation,
+                department_id,
+                username,
+                role_id,
+            } = payload;
+
+            member.set({
+                full_name: full_name ?? member.full_name,
+                email: email ?? member.email,
+                phone: phone ?? member.phone,
+                secondary_phone:
+                    secondary_phone !== undefined
+                        ? secondary_phone || null
+                        : member.secondary_phone,
+                whatsapp:
+                    whatsapp !== undefined ? whatsapp || null : member.whatsapp,
+                designation:
+                    designation !== undefined
+                        ? designation || null
+                        : member.designation,
+                department_id:
+                    department_id !== undefined
+                        ? department_id || null
+                        : member.department_id,
+            });
+            await member.save({ transaction: t });
+
+            if (user) {
+                user.set({
+                    username: username ?? user.username,
+                    email: email ?? user.email,
+                    department_id:
+                        department_id !== undefined
+                            ? department_id || null
+                            : user.department_id,
+                });
+                await user.save({ transaction: t });
+
+                if (role_id) {
+                    await this.UserRole.destroy({
+                        where: { user_id: user.id },
+                        transaction: t,
+                    });
+                    await this.UserRole.create(
+                        {
+                            user_id: user.id,
+                            role_id,
+                            department_id: department_id || 0,
+                        },
+                        { transaction: t },
+                    );
+                }
+            }
+
+            if (avatarFile) {
+                await this.applyAvatar(member, avatarFile, t);
+            }
+
+            await t.commit();
+            this.normalizeAvatarPath(member);
+            return member;
+        } catch (err) {
+            await t.rollback();
+            throw err;
+        }
+    }
+
+    async delete(id) {
+        const t = await this.sequelize.transaction();
+        try {
+            const member = await this.Member.findByPk(id, { transaction: t });
+            if (!member) {
+                const err = new Error("Member not found");
+                err.statusCode = 404;
+                throw err;
+            }
+
+            const user = await this.User.findOne({
+                where: { member_id: id },
+                transaction: t,
+            });
+
+            if (user) {
+                await this.UserRole.destroy({
+                    where: { user_id: user.id },
+                    transaction: t,
+                });
+                user.deleted_at = new Date();
+                await user.save({ transaction: t });
+            }
+
+            await member.destroy({ transaction: t });
+            await t.commit();
+        } catch (err) {
+            await t.rollback();
+            throw err;
+        }
+    }
+
+    async applyAvatar(member, file, transaction = null) {
+        if (!file || !file.buffer) {
+            const err = new Error("Avatar file is required");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const allowedTypes = {
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+        };
+        const ext = allowedTypes[file.mimetype];
+        if (!ext) {
+            const err = new Error("Only JPG and PNG images are allowed");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (file.buffer.length > 50 * 1024) {
+            const err = new Error("Avatar must be 50KB or smaller");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const metadata = await sharp(file.buffer).metadata();
+        const withinRange =
+            metadata.width >= 250 &&
+            metadata.height >= 250 &&
+            metadata.width <= 512 &&
+            metadata.height <= 512;
+        if (!withinRange) {
+            const err = new Error(
+                "Avatar must be between 250x250 and 512x512 pixels",
+            );
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const fileName = `${crypto.randomBytes(16).toString("hex")}${ext}`;
+        const uploadDir = path.join(uploadRoot, "members", String(member.id));
+        await fs.mkdir(uploadDir, { recursive: true });
+        const diskPath = path.join(uploadDir, fileName);
+        await fs.writeFile(diskPath, file.buffer);
+
+        const avatarPath = `/upload/members/${member.id}/${fileName}`;
+        member.avatar_path = avatarPath;
+        await member.save(transaction ? { transaction } : undefined);
+    }
+}
