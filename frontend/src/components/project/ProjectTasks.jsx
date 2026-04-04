@@ -34,7 +34,7 @@ export default function ProjectTasks({
                     placeholder="Search tasks..."
                     className="w-full rounded-full border auth-border bg-white/5 px-4 py-2 text-xs text-slate-200 placeholder:text-slate-500 md:w-64"
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <select
                         value={tasksSortBy}
                         onChange={(e) => setTasksSortBy(e.target.value)}
@@ -122,8 +122,9 @@ export default function ProjectTasks({
                                     </span>
                                 </button>
                                 {isExpanded ? (
-                                    <div className="mt-4 overflow-x-auto overflow-y-hidden">
-                                        <div className="min-w-[900px] space-y-3">
+                                    <div className="mt-4 space-y-3">
+                                        <div className="hidden md:block overflow-x-auto overflow-y-hidden">
+                                            <div className="min-w-[860px] space-y-3">
                                             <div className="grid grid-cols-[1.2fr_2fr_1fr_1fr_0.7fr_0.8fr_0.6fr] gap-3 rounded-2xl border auth-border bg-white/5 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] auth-accent">
                                                 <span>Task name</span>
                                                 <span>Description</span>
@@ -274,6 +275,147 @@ export default function ProjectTasks({
                                                     </div>
                                                 );
                                             })}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3 md:hidden">
+                                            {group.tasks.map((task) => {
+                                                const ownerEntry =
+                                                    project?.projectMembers?.find(
+                                                        (entry) =>
+                                                            entry.member_id ===
+                                                                task.owner_id ||
+                                                            entry.member?.id ===
+                                                                task.owner_id,
+                                                    ) || null;
+                                                const owner =
+                                                    ownerEntry?.member || null;
+                                                const priority = (
+                                                    task.priority || "MEDIUM"
+                                                )
+                                                    .toString()
+                                                    .toUpperCase();
+                                                const priorityStyles = {
+                                                    LOW: "bg-emerald-500/15 text-emerald-200 border-emerald-400/30",
+                                                    MEDIUM: "bg-amber-500/15 text-amber-200 border-amber-400/30",
+                                                    HIGH: "bg-rose-500/15 text-rose-200 border-rose-400/30",
+                                                };
+                                                return (
+                                                    <div
+                                                        key={task.id}
+                                                        className="rounded-2xl border auth-border bg-slate-900/30 p-4 space-y-3"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                openTaskDetail(
+                                                                    task,
+                                                                )
+                                                            }
+                                                            className="text-left text-sm font-semibold auth-text-primary underline underline-offset-4"
+                                                        >
+                                                            {task.title}
+                                                        </button>
+                                                        <p className="text-xs auth-text-secondary">
+                                                            {truncateString(
+                                                                task.description,
+                                                                80,
+                                                            ) || "—"}
+                                                        </p>
+                                                        <div className="flex flex-wrap items-center gap-2 text-xs auth-text-secondary">
+                                                            <span>
+                                                                {formatDateTime(
+                                                                    task.due_date,
+                                                                ) || "—"}
+                                                            </span>
+                                                            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold text-slate-200">
+                                                                {task.status ||
+                                                                    "—"}
+                                                            </span>
+                                                            <span
+                                                                className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${
+                                                                    priorityStyles[
+                                                                        priority
+                                                                    ] ||
+                                                                    "bg-white/5 border-white/10 text-slate-200"
+                                                                }`}
+                                                            >
+                                                                {priority}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="h-8 w-8 overflow-hidden rounded-full border border-white/10 bg-slate-800/70 flex items-center justify-center">
+                                                                    {owner?.avatar_path ? (
+                                                                        <img
+                                                                            src={
+                                                                                owner.avatar_path
+                                                                            }
+                                                                            alt={
+                                                                                owner.full_name ||
+                                                                                "Assignee"
+                                                                            }
+                                                                            className="h-full w-full object-cover"
+                                                                        />
+                                                                    ) : (
+                                                                        <UserRound
+                                                                            size={
+                                                                                14
+                                                                            }
+                                                                            className="text-slate-400"
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                                {owner ? (
+                                                                    <Link
+                                                                        to={`/members/${
+                                                                            owner.id ||
+                                                                            ownerEntry?.member_id
+                                                                        }`}
+                                                                        className="text-xs auth-text-secondary underline underline-offset-4"
+                                                                    >
+                                                                        {owner.full_name ||
+                                                                            "Member"}
+                                                                    </Link>
+                                                                ) : (
+                                                                    <span className="text-xs auth-text-secondary">
+                                                                        Unassigned
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        openTaskEdit(
+                                                                            task,
+                                                                        )
+                                                                    }
+                                                                    className="rounded-full border auth-border bg-white/5 p-2 text-slate-200"
+                                                                    title="Edit task"
+                                                                >
+                                                                    <Pencil
+                                                                        size={14}
+                                                                    />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleDeleteTask(
+                                                                            task,
+                                                                        )
+                                                                    }
+                                                                    className="rounded-full border auth-border bg-white/5 p-2 text-rose-200"
+                                                                    title="Delete task"
+                                                                >
+                                                                    <Trash2
+                                                                        size={14}
+                                                                    />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 ) : null}
@@ -302,7 +444,7 @@ export default function ProjectTasks({
                             {tasksPagination.total || 0}
                         </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <select
                             value={tasksPageSize}
                             onChange={(e) => {

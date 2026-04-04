@@ -43,7 +43,7 @@ export default function AuthLayout() {
                 {/* Mobile drawer */}
                 <div
                     id="auth-sidebar"
-                    className={`fixed inset-y-0 left-0 z-50 w-64 border-r auth-border auth-surface backdrop-blur transition-transform duration-300 ease-out md:w-72 lg:hidden ${
+                    className={`fixed inset-y-0 left-0 z-50 w-64 border-r auth-border auth-surface backdrop-blur transition-transform duration-300 ease-out md:w-72 xl:hidden ${
                         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
                     }`}
                     role="dialog"
@@ -53,7 +53,7 @@ export default function AuthLayout() {
                 </div>
                 {isSidebarOpen && (
                     <div
-                        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+                        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm xl:hidden"
                         onClick={() => setSidebarOpen(false)}
                     />
                 )}
@@ -64,7 +64,7 @@ export default function AuthLayout() {
                         onToggleMenu={toggleSidebar}
                         isSidebarOpen={isSidebarOpen}
                     />
-                    <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+                    <main className="flex-1 min-w-0 px-4 py-6 sm:px-6 sm:py-8 xl:px-10">
                         <Outlet />
                     </main>
                 </div>

@@ -28,7 +28,7 @@ export default function ProjectActions({
                     placeholder="Search activities..."
                     className="w-full rounded-full border auth-border bg-white/5 px-4 py-2 text-xs text-slate-200 placeholder:text-slate-500 md:w-64"
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <select
                         value={actionsSortBy}
                         onChange={(e) => setActionsSortBy(e.target.value)}
@@ -110,7 +110,7 @@ export default function ProjectActions({
                             {actionsPagination.total || 0}
                         </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <select
                             value={actionsPageSize}
                             onChange={(e) => {

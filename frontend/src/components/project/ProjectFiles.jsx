@@ -112,7 +112,7 @@ export default function ProjectFiles({
                     </div>
                 ))}
             </div>
-            <div className="overflow-x-auto overflow-y-hidden">
+            <div className="hidden md:block overflow-x-auto overflow-y-hidden">
                 <div className="min-w-[820px] space-y-2">
                     <div className="grid grid-cols-[2fr_0.9fr_0.8fr_1fr_1fr_0.6fr] gap-3 rounded-2xl border auth-border bg-white/5 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] auth-accent">
                         <span>File name</span>
@@ -248,6 +248,104 @@ export default function ProjectFiles({
                     )}
                 </div>
             </div>
+            <div className="space-y-3 md:hidden">
+                {filesLoading ? (
+                    <p className="text-sm auth-text-secondary">Loading files...</p>
+                ) : filesError ? (
+                    <p className="text-sm text-rose-200">{filesError}</p>
+                ) : files.length ? (
+                    files.map((item) => {
+                        let sharedList = [];
+                        if (Array.isArray(item.shared_with)) {
+                            sharedList = item.shared_with;
+                        } else if (typeof item.shared_with === "string") {
+                            try {
+                                const parsed = JSON.parse(item.shared_with);
+                                sharedList = Array.isArray(parsed) ? parsed : [];
+                            } catch (_) {
+                                sharedList = [];
+                            }
+                        }
+                        const sharedCount = sharedList.length;
+                        const sharedScope = item.share_scope || "only_me";
+                        const SharedIcon =
+                            sharedScope === "all_members" ||
+                            (sharedScope === "selected" && sharedCount)
+                                ? Users
+                                : Lock;
+                        const sharedLabel =
+                            sharedScope === "all_members"
+                                ? "All members"
+                                : sharedScope === "selected"
+                                  ? `${sharedCount} people`
+                                  : "Only me";
+
+                        return (
+                            <div
+                                key={item.id}
+                                className="rounded-2xl border auth-border bg-slate-900/30 p-4 space-y-3"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5">
+                                        {item.is_folder ? (
+                                            <Folder size={16} className="text-amber-200" />
+                                        ) : (
+                                            <FileText size={16} className="text-sky-200" />
+                                        )}
+                                    </div>
+                                    {item.is_folder ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOpenFolder(item)}
+                                            className="text-left text-sm font-semibold auth-text-primary underline underline-offset-4"
+                                        >
+                                            {item.name}
+                                        </button>
+                                    ) : (
+                                        <span className="text-sm font-semibold auth-text-primary">
+                                            {item.name}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs auth-text-secondary">
+                                    <span>{item.is_folder ? "Folder" : getShortFileType(item.mime_type)}</span>
+                                    <span>
+                                        {item.is_folder ? "—" : formatBytes(item.size_bytes)}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1">
+                                        <SharedIcon size={12} className="text-slate-400" />
+                                        {sharedLabel}
+                                    </span>
+                                    <span>
+                                        {formatDateTime(item.updated_at, "dd/LL/yyyy HH:mm") ||
+                                            "—"}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        className="rounded-full border auth-border bg-white/5 p-2 text-slate-200"
+                                        title="Download"
+                                        onClick={() => handleDownloadFile(item)}
+                                    >
+                                        <Download size={14} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="rounded-full border auth-border bg-white/5 p-2 text-rose-200"
+                                        title="Delete"
+                                        onClick={() => handleDeleteFile(item)}
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })
+                ) : (
+                    <p className="text-sm auth-text-secondary">No files found.</p>
+                )}
+            </div>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="text-xs auth-text-secondary">
                     Showing{" "}
@@ -261,7 +359,7 @@ export default function ProjectFiles({
                     of{" "}
                     <span className="text-slate-200">{filesTotal}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <select
                         value={filesPageSize}
                         onChange={(e) => {

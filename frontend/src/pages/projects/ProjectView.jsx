@@ -1164,34 +1164,34 @@ export default function ProjectView() {
     }
 
     return (
-        <div className="space-y-6">
-            <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
+        <div className="space-y-6 min-w-0 overflow-x-hidden">
+            <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
                     <p className="text-xs uppercase tracking-[0.25em] auth-accent">
                         Projects
                     </p>
-                    <h1 className="text-3xl font-semibold auth-text-primary flex items-center gap-2">
+                    <h1 className="flex flex-wrap items-center gap-2 break-words text-xl font-semibold leading-tight auth-text-primary sm:text-2xl lg:text-3xl">
                         <span
-                            className={`inline-block h-5 w-5 rounded-full ${
+                            className={`inline-block h-4 w-4 shrink-0 rounded-full sm:h-5 sm:w-5 ${
                                 statusBadge[project.rag_status] || "bg-white/30"
                             }`}
                             title={project.rag_status || "N/A"}
                         />
-                        {project.title}
+                        <span className="min-w-0 break-words">{project.title}</span>
                     </h1>
-                    <div className="flex items-center justify-between gap-8 mt-2">
-                        <p className="text-sm auth-text-secondary">
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+                        <p className="break-words text-sm auth-text-secondary">
                             Code: {project.code}
                         </p>
-                        <p className="text-sm auth-text-secondary">
+                        <p className="break-words text-sm auth-text-secondary">
                             Current Stage:{" "}
-                            <span className="w-fit rounded-full px-3 py-1 text-[11px] font-semibold bg-white/10 text-slate-900 md:text-slate-400">
+                            <span className="inline-flex w-fit rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-400">
                                 {project.currentStage?.stage_slug || "N/A"}
                             </span>
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center justify-center gap-2">
+                <div className="flex flex-wrap items-center justify-center gap-2">
                     <Link
                         to={`/projects/${project.id}/edit`}
                         className="rounded-full border auth-border px-4 py-2 text-xs font-semibold auth-text-primary"
@@ -1207,20 +1207,20 @@ export default function ProjectView() {
                 </div>
             </header>
 
-            <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-3xl border auth-border auth-surface p-6 md:col-span-2 auth-shadow">
+            <div className="grid gap-4 lg:grid-cols-3">
+                <div className="min-w-0 rounded-3xl border auth-border auth-surface p-4 sm:p-6 lg:col-span-2 auth-shadow">
                     <h3 className="text-lg font-semibold auth-text-primary">
                         Overview
                     </h3>
                     <p className="mt-3 text-sm auth-text-secondary leading-relaxed">
                         {project.description || "No description provided yet."}
                     </p>
-                    <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                    <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         <div className="rounded-2xl border auth-border auth-surface p-4">
                             <p className="text-xs uppercase tracking-[0.2em] auth-accent">
                                 Department
                             </p>
-                            <p className="mt-2 text-sm auth-text-primary">
+                            <p className="mt-2 break-words text-sm auth-text-primary">
                                 {project.department?.name ||
                                 project.department_name ? (
                                     <Link
@@ -1240,7 +1240,7 @@ export default function ProjectView() {
                             <p className="text-xs uppercase tracking-[0.2em] auth-accent">
                                 Owner
                             </p>
-                            <p className="mt-2 text-sm auth-text-primary">
+                            <p className="mt-2 break-words text-sm auth-text-primary">
                                 {project.owner?.member?.full_name ||
                                 project.owner_name ? (
                                     <Link
@@ -1374,12 +1374,12 @@ export default function ProjectView() {
                     </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="min-w-0 space-y-4">
                     <div className="rounded-3xl border auth-border auth-surface p-6 auth-shadow">
                         <h3 className="text-lg font-semibold auth-text-primary">
                             Dates
                         </h3>
-                        <div className="flex items-center justify-between mt-3 space-y-2 text-sm auth-text-secondary">
+                        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 text-sm auth-text-secondary">
                             <div className="">
                                 <p className="text-xs uppercase tracking-[0.2em] auth-accent">
                                     Planned Start
@@ -1398,7 +1398,7 @@ export default function ProjectView() {
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between mt-3 space-y-2 text-sm auth-text-secondary">
+                        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 text-sm auth-text-secondary">
                             <div className="">
                                 <p className="text-xs uppercase tracking-[0.2em] auth-accent">
                                     Revised Start
@@ -1425,7 +1425,7 @@ export default function ProjectView() {
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between mt-3 space-y-2 text-sm auth-text-secondary">
+                        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 text-sm auth-text-secondary">
                             <div className="">
                                 <p className="text-xs uppercase tracking-[0.2em] auth-accent">
                                     Actual Start
@@ -1474,9 +1474,10 @@ export default function ProjectView() {
 
             <div className="grid gap-4">
                 <div className="rounded-3xl border auth-border auth-surface p-6 md:col-span-2 auth-shadow">
-                    <div className="mt-10 rounded-3xl border auth-border auth-surface p-6 auth-shadow bg-gradient-to-br from-white/5 to-white/0">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.25em] auth-accent">
+                    <div className="mt-10 rounded-3xl border auth-border auth-surface p-4 sm:p-6 auth-shadow bg-gradient-to-br from-white/5 to-white/0">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="w-full overflow-x-auto">
+                                <div className="flex min-w-max gap-2 text-xs uppercase tracking-[0.25em] auth-accent">
                                 {[
                                     {
                                         key: "milestones",
@@ -1503,23 +1504,24 @@ export default function ProjectView() {
                                         label: "Activities",
                                         icon: Activity,
                                     },
-                                ].map((tab) => (
-                                    <button
-                                        key={tab.key}
-                                        type="button"
-                                        onClick={() => setActiveTab(tab.key)}
-                                        className={`rounded-full border px-4 py-2 text-[11px] font-semibold ${
-                                            activeTab === tab.key
-                                                ? "border-amber-200/70 text-amber-100"
-                                                : "border-white/10 text-slate-400"
-                                        }`}
-                                    >
-                                        <span className="inline-flex items-center gap-2">
-                                            <tab.icon size={12} />
-                                            {tab.label}
-                                        </span>
-                                    </button>
-                                ))}
+                                    ].map((tab) => (
+                                        <button
+                                            key={tab.key}
+                                            type="button"
+                                            onClick={() => setActiveTab(tab.key)}
+                                            className={`rounded-full border px-4 py-2 text-[11px] font-semibold whitespace-nowrap ${
+                                                activeTab === tab.key
+                                                    ? "border-amber-200/70 text-amber-100"
+                                                    : "border-white/10 text-slate-400"
+                                            }`}
+                                        >
+                                            <span className="inline-flex items-center gap-2">
+                                                <tab.icon size={12} />
+                                                {tab.label}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                             {activeTab === "milestones" ||
                             activeTab === "tasks" ||
@@ -1656,8 +1658,8 @@ export default function ProjectView() {
             </div>
 
             {modalOpen ? (
-                <div className="mt-4 space-y-4 fixed left-1/2 top-1/2 z-50 flex h-3/4 w-3/4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-3xl bg-slate-950 p-4">
-                    <div className="w-full max-w-lg rounded-3xl border auth-border auth-surface p-6 auth-shadow">
+                <div className="fixed inset-3 z-50 mt-0 flex items-center justify-center rounded-2xl bg-slate-950/95 p-3 sm:inset-6 sm:rounded-3xl sm:p-4">
+                    <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-3xl border auth-border auth-surface p-6 auth-shadow">
                         <div className="flex items-center justify-between gap-3">
                             <div>
                                 <p className="text-[11px] uppercase tracking-[0.25em] auth-accent">
@@ -2178,8 +2180,8 @@ export default function ProjectView() {
             ) : null}
 
             {taskDetailOpen && taskDetail ? (
-                <div className="mt-4 space-y-4 fixed left-1/2 top-1/2 z-50 flex h-3/4 w-3/4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-3xl bg-slate-950 p-4">
-                    <div className="w-full max-w-2xl rounded-3xl border auth-border auth-surface p-6 auth-shadow">
+                <div className="fixed inset-3 z-50 mt-0 flex items-center justify-center rounded-2xl bg-slate-950/95 p-3 sm:inset-6 sm:rounded-3xl sm:p-4">
+                    <div className="max-h-full w-full max-w-2xl overflow-y-auto rounded-3xl border auth-border auth-surface p-6 auth-shadow">
                         <div className="flex items-center justify-between gap-3">
                             <div>
                                 <p className="text-[11px] uppercase tracking-[0.25em] auth-accent">
@@ -2301,8 +2303,8 @@ export default function ProjectView() {
             ) : null}
 
             {fileModalOpen ? (
-                <div className="mt-4 space-y-4 fixed left-1/2 top-1/2 z-50 flex h-3/4 w-3/4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-3xl bg-slate-950 p-4">
-                    <div className="w-full max-w-lg rounded-3xl border auth-border auth-surface p-6 auth-shadow">
+                <div className="fixed inset-3 z-50 mt-0 flex items-center justify-center rounded-2xl bg-slate-950/95 p-3 sm:inset-6 sm:rounded-3xl sm:p-4">
+                    <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-3xl border auth-border auth-surface p-6 auth-shadow">
                         <div className="flex items-center justify-between gap-3">
                             <div>
                                 <p className="text-[11px] uppercase tracking-[0.25em] auth-accent">

@@ -40,7 +40,7 @@ export default function ProjectMilestones({
                     placeholder="Search milestones..."
                     className="w-full rounded-full border auth-border bg-white/5 px-4 py-2 text-xs text-slate-200 placeholder:text-slate-500 md:w-64"
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <select
                         value={milestonesSortBy}
                         onChange={(e) => setMilestonesSortBy(e.target.value)}
@@ -76,57 +76,50 @@ export default function ProjectMilestones({
                             milestone.due_date,
                         );
                         return (
-                            <div key={milestone.id} className="relative ">
-                                <div className="rounded-2xl border auth-border bg-slate-900/30 px-4 py-3 pl-20">
-                                    <div className="absolute -left-4 top-1/2 -translate-y-1/2">
-                                        <div className="flex h-16 w-16 flex-col items-center justify-center rounded-2xl border auth-border bg-slate-950/70 text-center shadow-lg">
-                                            <p className="text-xl font-semibold auth-text-primary">
+                            <div
+                                key={milestone.id}
+                                className="rounded-2xl border auth-border bg-slate-900/30 p-4"
+                            >
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl border auth-border bg-slate-950/70 text-center">
+                                            <p className="text-lg font-semibold auth-text-primary">
                                                 {dateParts.day}
                                             </p>
-                                            <p className="text-[11px] uppercase tracking-[0.2em] auth-accent">
+                                            <p className="text-[10px] uppercase tracking-[0.2em] auth-accent">
                                                 {dateParts.month}
                                             </p>
                                         </div>
-                                    </div>
-                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                        <div>
+                                        <div className="min-w-0">
                                             <p className="text-sm font-semibold auth-text-primary">
                                                 {milestone.title}
                                             </p>
-                                            <p>
-                                                <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold text-slate-300">
-                                                    {milestone.status}
-                                                </span>
-                                            </p>
+                                            <span className="mt-2 inline-flex rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold text-slate-300">
+                                                {milestone.status}
+                                            </span>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        openMilestoneEdit(
-                                                            milestone,
-                                                        )
-                                                    }
-                                                    className="rounded-full border auth-border bg-white/5 p-2 text-slate-200"
-                                                    title="Edit milestone"
-                                                >
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        handleDeleteMilestone(
-                                                            milestone,
-                                                        )
-                                                    }
-                                                    className="rounded-full border auth-border bg-white/5 p-2 text-rose-200"
-                                                    title="Delete milestone"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 sm:self-auto">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                openMilestoneEdit(milestone)
+                                            }
+                                            className="rounded-full border auth-border bg-white/5 p-2 text-slate-200"
+                                            title="Edit milestone"
+                                        >
+                                            <Pencil size={14} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleDeleteMilestone(milestone)
+                                            }
+                                            className="rounded-full border auth-border bg-white/5 p-2 text-rose-200"
+                                            title="Delete milestone"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -157,7 +150,7 @@ export default function ProjectMilestones({
                             {milestonesPagination.total || 0}
                         </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <select
                             value={milestonesPageSize}
                             onChange={(e) => {

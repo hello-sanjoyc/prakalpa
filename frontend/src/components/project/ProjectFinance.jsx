@@ -84,7 +84,7 @@ export default function ProjectFinance({
                     placeholder="Search finance entries..."
                     className="w-full rounded-full border auth-border bg-white/5 px-4 py-2 text-xs text-slate-200 placeholder:text-slate-500 md:w-64"
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <select
                         value={financesSortBy}
                         onChange={(e) => setFinancesSortBy(e.target.value)}
@@ -113,7 +113,7 @@ export default function ProjectFinance({
                 </div>
             </div>
 
-            <div className="overflow-x-auto overflow-y-hidden">
+            <div className="hidden md:block overflow-x-auto overflow-y-hidden">
                 <div className="min-w-[860px] space-y-2">
                     <div className="grid grid-cols-[1fr_1fr_1fr_2fr_0.6fr] gap-3 rounded-2xl border auth-border bg-white/5 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] auth-accent">
                         <span>Date</span>
@@ -175,6 +175,51 @@ export default function ProjectFinance({
                     )}
                 </div>
             </div>
+            <div className="space-y-3 md:hidden">
+                {financesLoading ? (
+                    <p className="text-sm auth-text-secondary">
+                        Loading finance entries...
+                    </p>
+                ) : financesError ? (
+                    <p className="text-sm text-rose-200">{financesError}</p>
+                ) : finances.length ? (
+                    finances.map((entry) => (
+                        <div
+                            key={entry.id}
+                            className="rounded-2xl border auth-border bg-slate-900/30 p-4 space-y-3"
+                        >
+                            <div className="grid grid-cols-2 gap-2 text-xs auth-text-secondary">
+                                <span>{formatDateTime(entry.entry_date) || "—"}</span>
+                                <span>{formatMoney(entry.fund_allocated || 0)}</span>
+                                <span>{formatMoney(entry.fund_consumed || 0)}</span>
+                                <span>{entry.note || "—"}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => openFinanceEdit(entry)}
+                                    className="rounded-full border auth-border bg-white/5 p-2 text-slate-200"
+                                    title="Edit finance"
+                                >
+                                    <Pencil size={14} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDeleteFinance(entry)}
+                                    className="rounded-full border auth-border bg-white/5 p-2 text-rose-200"
+                                    title="Delete finance"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-sm auth-text-secondary">
+                        No finance entries found.
+                    </p>
+                )}
+            </div>
 
             {financesPagination ? (
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -195,7 +240,7 @@ export default function ProjectFinance({
                             {financesPagination.total || 0}
                         </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <select
                             value={financesPageSize}
                             onChange={(e) => {

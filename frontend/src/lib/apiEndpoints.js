@@ -78,4 +78,5 @@ export const API_ENDPOINTS = {
     PROJECT_MEMBER_ROLES: `${BASE_URL}/project-member-roles`,
 
     PROJECT_BY_MEMBER: (memberId) => `${BASE_URL}/projects?member=${memberId}`,
+    TASKS_DASHBOARD: `${BASE_URL}/projects/tasks/dashboard`,
 };

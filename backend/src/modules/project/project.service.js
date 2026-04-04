@@ -804,6 +804,125 @@ export default class ProjectService {
         }
     }
 
+    async getTaskDashboardSummary({
+        projectId = null,
+        memberId = null,
+        memberScope = null,
+        status = null,
+        priority = null,
+        authUserId = null,
+    } = {}) {
+        try {
+            const [authUser] =
+                (await this.sequelize.query(
+                    `
+                SELECT member_id
+                FROM users
+                WHERE id = :userId
+                LIMIT 1
+                `,
+                    {
+                        type: QueryTypes.SELECT,
+                        replacements: { userId: Number(authUserId) || 0 },
+                    },
+                )) || [];
+            const authMemberId = Number(authUser?.member_id) || 0;
+            if (!authMemberId) {
+                return {
+                    open: 0,
+                    in_progress: 0,
+                    blocked: 0,
+                    done: 0,
+                    total: 0,
+                };
+            }
+
+            const whereParts = [
+                "t.deleted_at IS NULL",
+                "m.deleted_at IS NULL",
+                "p.deleted_at IS NULL",
+            ];
+            const replacements = {};
+            const safeProjectId = Number(projectId) || 0;
+            if (safeProjectId > 0) {
+                whereParts.push("m.project_id = :projectId");
+                replacements.projectId = safeProjectId;
+            } else {
+                whereParts.push(
+                    `EXISTS (
+                        SELECT 1
+                        FROM project_members pm_scope
+                        WHERE pm_scope.project_id = m.project_id
+                          AND pm_scope.member_id = :authMemberId
+                    )`,
+                );
+                replacements.authMemberId = authMemberId;
+            }
+
+            const normalizedStatus = String(status || "").toUpperCase().trim();
+            if (normalizedStatus) {
+                whereParts.push("t.status = :status");
+                replacements.status = normalizedStatus;
+            }
+
+            const normalizedPriority = String(priority || "")
+                .toUpperCase()
+                .trim();
+            if (normalizedPriority) {
+                whereParts.push("t.priority = :priority");
+                replacements.priority = normalizedPriority;
+            }
+
+            const safeMemberId = Number(memberId) || 0;
+            if (safeMemberId > 0) {
+                whereParts.push("t.owner_id = :memberId");
+                replacements.memberId = safeMemberId;
+            } else if (String(memberScope || "").toLowerCase() === "me") {
+                whereParts.push("t.owner_id = :ownerMemberId");
+                replacements.ownerMemberId = authMemberId;
+            }
+
+            const whereClause = whereParts.length
+                ? `WHERE ${whereParts.join(" AND ")}`
+                : "";
+
+            const rows =
+                (await this.sequelize.query(
+                    `
+                SELECT t.status, COUNT(*) AS total
+                FROM tasks t
+                JOIN milestones m ON m.id = t.milestone_id
+                JOIN projects p ON p.id = m.project_id
+                ${whereClause}
+                GROUP BY t.status
+                `,
+                    {
+                        type: QueryTypes.SELECT,
+                        replacements,
+                    },
+                )) || [];
+
+            const statusMap = new Map(
+                rows.map((row) => [String(row.status || ""), Number(row.total) || 0]),
+            );
+            const open = statusMap.get("OPEN") || 0;
+            const inProgress = statusMap.get("IN_PROGRESS") || 0;
+            const blocked = statusMap.get("BLOCKED") || 0;
+            const done = statusMap.get("DONE") || 0;
+
+            return {
+                open,
+                in_progress: inProgress,
+                blocked,
+                done,
+                total: open + inProgress + blocked + done,
+            };
+        } catch (err) {
+            this.logError("getTaskDashboardSummary", err);
+            throw err;
+        }
+    }
+
     async createTask(projectId, payload = {}) {
         try {
             const milestoneId = Number(payload.milestone_id);

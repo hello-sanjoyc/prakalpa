@@ -190,6 +190,19 @@ export async function listProjectTasks(req, reply) {
     });
 }
 
+export async function listTaskDashboard(req, reply) {
+    const service = new ProjectService(req.server?.db);
+    const summary = await service.getTaskDashboardSummary({
+        projectId: req.query?.project_id,
+        memberId: req.query?.member_id,
+        memberScope: req.query?.member_scope,
+        status: req.query?.status,
+        priority: req.query?.priority,
+        authUserId: req.user?.sub || null,
+    });
+    return reply.send({ summary });
+}
+
 export async function createProjectTask(req, reply) {
     const service = new ProjectService(req.server?.db);
     const task = await service.createTask(req.params.id, req.body);

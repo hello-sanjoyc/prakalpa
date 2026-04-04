@@ -19,6 +19,7 @@ import {
     listProjectMilestones,
     listProjectMembers,
     listProjectTasks,
+    listTaskDashboard,
     listProjects,
     uploadProjectFile,
     updateProjectMilestone,
@@ -45,6 +46,7 @@ import {
     listProjectActionsSchema,
     listProjectMilestonesSchema,
     listProjectTasksSchema,
+    listTaskDashboardSchema,
     projectIdParamSchema,
     uploadProjectFileSchema,
     updateProjectMilestoneSchema,
@@ -60,6 +62,11 @@ export default async function projectRoutes(fastify) {
         "/",
         { schema: listProjectsSchema, preHandler: [auth] },
         listProjects,
+    );
+    fastify.get(
+        "/tasks/dashboard",
+        { schema: listTaskDashboardSchema, preHandler: [auth] },
+        listTaskDashboard,
     );
 
     fastify.get(

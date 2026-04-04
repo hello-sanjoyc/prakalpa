@@ -14,7 +14,7 @@ const navItems = [
 export default function AuthSidebar({ isMobile = false, onClose = () => {} }) {
     const containerClasses = isMobile
         ? "flex h-full w-full flex-col"
-        : "hidden w-72 min-w-[18rem] lg:flex lg:flex-col";
+        : "hidden w-72 min-w-[18rem] xl:flex xl:flex-col";
 
     return (
         <div

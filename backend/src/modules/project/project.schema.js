@@ -212,6 +212,42 @@ export const listProjectTasksSchema = {
     },
 };
 
+export const listTaskDashboardSchema = {
+    querystring: {
+        type: "object",
+        properties: {
+            project_id: { type: "integer", minimum: 1 },
+            member_id: { type: "integer", minimum: 1 },
+            member_scope: { type: "string", enum: ["all", "me"] },
+            status: {
+                type: "string",
+                enum: ["OPEN", "IN_PROGRESS", "BLOCKED", "DONE"],
+            },
+            priority: {
+                type: "string",
+                enum: ["LOW", "MEDIUM", "HIGH"],
+            },
+        },
+    },
+    response: {
+        200: {
+            type: "object",
+            properties: {
+                summary: {
+                    type: "object",
+                    properties: {
+                        open: { type: "integer" },
+                        in_progress: { type: "integer" },
+                        blocked: { type: "integer" },
+                        done: { type: "integer" },
+                        total: { type: "integer" },
+                    },
+                },
+            },
+        },
+    },
+};
+
 export const listProjectActionsSchema = {
     ...projectIdParamSchema,
     querystring: {

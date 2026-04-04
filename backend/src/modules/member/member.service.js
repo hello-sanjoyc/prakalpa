@@ -89,6 +89,10 @@ export default class MemberService {
             extraWhere.push("pm_self.member_id IS NOT NULL");
             extraWhere.push("m.id <> :projectMemberId");
         }
+        const projectMemberJoin = projectMember
+            ? `LEFT JOIN project_members pm ON pm.member_id = m.id
+            LEFT JOIN project_members pm_self ON pm_self.project_id = pm.project_id AND pm_self.member_id = :projectMemberId`
+            : "";
 
         const whereClause = trimmedSearch
             ? `WHERE (
@@ -127,8 +131,7 @@ export default class MemberService {
             LEFT JOIN user_roles ur ON ur.user_id = u.id
             LEFT JOIN roles r ON r.id = ur.role_id 
             LEFT JOIN departments d ON d.id = m.department_id
-            LEFT JOIN project_members pm ON pm.member_id = m.id
-            LEFT JOIN project_members pm_self ON pm_self.project_id = pm.project_id AND pm_self.member_id = :projectMemberId
+            ${projectMemberJoin}
             ${finalWhereClause}
             GROUP BY m.id, u.id
             ORDER BY ${orderBy} ${orderDir}, m.full_name ASC
@@ -155,8 +158,7 @@ export default class MemberService {
             LEFT JOIN users u ON u.member_id = m.id AND u.deleted_at IS NULL
             LEFT JOIN user_roles ur ON ur.user_id = u.id
             LEFT JOIN roles r ON r.id = ur.role_id
-            LEFT JOIN project_members pm ON pm.member_id = m.id
-            LEFT JOIN project_members pm_self ON pm_self.project_id = pm.project_id AND pm_self.member_id = :projectMemberId
+            ${projectMemberJoin}
             ${finalWhereClause}
             `;
 
