@@ -1,7 +1,9 @@
 export const departmentIdParamSchema = {
     params: {
         type: "object",
-        properties: { id: { type: "integer" } },
+        properties: {
+            id: { type: "string", pattern: "^[a-fA-F0-9]{32}$" },
+        },
         required: ["id"],
     },
 };
@@ -9,7 +11,7 @@ export const departmentIdParamSchema = {
 const departmentBodyProperties = {
     name: { type: "string", maxLength: 255 },
     code: { type: "string", maxLength: 64 },
-    parent_id: { type: ["integer", "null"] },
+    parent_id: { type: ["integer", "string", "null"] },
 };
 
 export const listDepartmentsSchema = {
@@ -75,7 +77,7 @@ export const optionsSchema = {
                     items: {
                         type: "object",
                         properties: {
-                            id: { type: "integer" },
+                            id: { type: "string" },
                             name: { type: "string" },
                             code: { type: "string" },
                         },
@@ -97,7 +99,7 @@ export const departmentMembersSchema = {
                     items: {
                         type: "object",
                         properties: {
-                            id: { type: "integer" },
+                            id: { type: "string" },
                             full_name: { type: "string" },
                             email: { type: "string" },
                             designation: { type: "string" },
@@ -122,7 +124,7 @@ export const departmentStagesSchema = {
                     items: {
                         type: "object",
                         properties: {
-                            id: { type: "integer" },
+                            id: { type: "string" },
                             stage_slug: { type: "string" },
                             stage_order: { type: "integer" },
                         },
@@ -144,7 +146,7 @@ export const departmentVendorsSchema = {
                     items: {
                         type: "object",
                         properties: {
-                            id: { type: "integer" },
+                            id: { type: "string" },
                             full_name: { type: "string" },
                             email: { type: "string" },
                             designation: { type: "string" },

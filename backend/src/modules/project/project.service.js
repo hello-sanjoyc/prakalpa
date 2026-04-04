@@ -6,6 +6,11 @@ import { Sequelize, QueryTypes } from "sequelize";
 import initModels from "../../models/index.js";
 import { env } from "../../config/index.js";
 import logger from "../../config/logger.js";
+import {
+    resolveIdArrayFromModel,
+    resolveIdFromModel,
+    resolveOptionalIdFromModel,
+} from "../../lib/id-hash.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,6 +81,75 @@ export default class ProjectService {
         return path.join(uploadRoot, relative);
     }
 
+    async resolveProjectId(id) {
+        return resolveIdFromModel(this.Project, id, "project_id");
+    }
+
+    async resolveMemberId(id, label = "member_id") {
+        return resolveOptionalIdFromModel(this.Member, id, label);
+    }
+
+    async resolveMilestoneId(id, label = "milestone_id") {
+        return resolveOptionalIdFromModel(this.Milestone, id, label);
+    }
+
+    async resolveTaskId(id, label = "task_id") {
+        return resolveOptionalIdFromModel(this.Task, id, label);
+    }
+
+    async resolveFinanceId(id, label = "finance_id") {
+        return resolveOptionalIdFromModel(this.ProjectFinance, id, label);
+    }
+
+    async resolveFileId(id, label = "file_id") {
+        return resolveOptionalIdFromModel(this.ProjectFile, id, label);
+    }
+
+    async normalizeProjectPayloadIds(payload = {}) {
+        const out = { ...(payload || {}) };
+        if (Object.prototype.hasOwnProperty.call(out, "department_id")) {
+            out.department_id = await resolveOptionalIdFromModel(
+                this.Department,
+                out.department_id,
+                "department_id",
+            );
+        }
+        if (Object.prototype.hasOwnProperty.call(out, "owner_id")) {
+            out.owner_id = await resolveOptionalIdFromModel(
+                this.User,
+                out.owner_id,
+                "owner_id",
+            );
+        }
+        if (Object.prototype.hasOwnProperty.call(out, "current_stage_id")) {
+            out.current_stage_id = await resolveOptionalIdFromModel(
+                this.ProjectStage,
+                out.current_stage_id,
+                "current_stage_id",
+            );
+        }
+        if (Array.isArray(out.vendor_ids)) {
+            out.vendor_ids = await resolveIdArrayFromModel(
+                this.Member,
+                out.vendor_ids,
+                "vendor_ids",
+            );
+        }
+        if (Array.isArray(out.project_members)) {
+            out.project_members = await Promise.all(
+                out.project_members.map(async (item) => ({
+                    ...item,
+                    member_id: await resolveIdFromModel(
+                        this.Member,
+                        item?.member_id,
+                        "member_id",
+                    ),
+                })),
+            );
+        }
+        return out;
+    }
+
     async generateUniqueProjectCode(transaction = null) {
         try {
             const maxAttempts = 10;
@@ -112,6 +186,13 @@ export default class ProjectService {
         includeDeleted = false,
     } = {}) {
         try {
+            const hasMemberFilter =
+                member !== null &&
+                member !== undefined &&
+                String(member).trim() !== "";
+            const memberId = hasMemberFilter
+                ? await resolveIdFromModel(this.Member, member, "member")
+                : null;
             const safePage = Math.max(Number(page) || 1, 1);
             const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 200);
             const offset = (safePage - 1) * safeLimit;
@@ -132,7 +213,7 @@ export default class ProjectService {
             if (!includeDeleted) {
                 whereClauseParts.push("p.deleted_at IS NULL");
             }
-            if (member) {
+            if (memberId) {
                 whereClauseParts.push(
                     `(pm.member_id = :memberId OR u.member_id = :memberId)`,
                 );
@@ -146,7 +227,7 @@ export default class ProjectService {
                 ? `WHERE ${whereClauseParts.join(" AND ")}`
                 : "";
 
-            const joinClause = member
+            const joinClause = memberId
                 ? "LEFT JOIN project_members pm ON pm.project_id = p.id"
                 : "";
 
@@ -180,7 +261,7 @@ export default class ProjectService {
                         limit: safeLimit,
                         offset,
                         ...(likeSearch ? { search: likeSearch } : {}),
-                        ...(member ? { memberId: Number(member) } : {}),
+                        ...(memberId ? { memberId } : {}),
                     },
                 })) || [];
 
@@ -200,7 +281,7 @@ export default class ProjectService {
                     type: QueryTypes.SELECT,
                     replacements: {
                         ...(likeSearch ? { search: likeSearch } : {}),
-                        ...(member ? { memberId: Number(member) } : {}),
+                        ...(memberId ? { memberId } : {}),
                     },
                 })) || [];
 
@@ -218,8 +299,9 @@ export default class ProjectService {
 
     async getById(id) {
         try {
+            const projectId = await this.resolveProjectId(id);
             const project = await this.Project.findOne({
-                where: { id, deleted_at: null },
+                where: { id: projectId, deleted_at: null },
                 include: [
                     {
                         model: this.Department,
@@ -234,7 +316,7 @@ export default class ProjectService {
                             {
                                 model: this.Member,
                                 as: "member",
-                                attributes: ["id", "full_name"],
+                                attributes: ["id", "full_name", "avatar_path"],
                             },
                         ],
                     },
@@ -270,8 +352,25 @@ export default class ProjectService {
                 throw err;
             }
             const members = project.projectMembers || [];
-            if (env.BASE_URL && members.length) {
+            if (env.BASE_URL) {
                 const base = String(env.BASE_URL).replace(/\/$/, "");
+                const ownerMember = project.owner?.member;
+                if (
+                    ownerMember?.avatar_path &&
+                    !/^https?:\/\//i.test(ownerMember.avatar_path)
+                ) {
+                    const suffix = ownerMember.avatar_path.startsWith("/")
+                        ? ownerMember.avatar_path
+                        : `/${ownerMember.avatar_path}`;
+                    ownerMember.avatar_path = `${base}${suffix}`;
+                }
+                if (!members.length) {
+                    const stages = await this.ProjectStage.findAll({
+                        order: [["stage_order", "ASC"]],
+                    });
+                    project.setDataValue("stages", stages);
+                    return project;
+                }
                 members.forEach((entry) => {
                     const member = entry?.member;
                     if (!member?.avatar_path) return;
@@ -295,8 +394,11 @@ export default class ProjectService {
 
     async create(payload) {
         try {
+            const normalizedPayload = await this.normalizeProjectPayloadIds(
+                payload || {},
+            );
             const { project_members: projectMembers = [], ...rest } =
-                payload || {};
+                normalizedPayload || {};
             const project = await this.sequelize.transaction(async (t) => {
                 const code = await this.generateUniqueProjectCode(t);
                 const created = await this.Project.create(
@@ -370,14 +472,18 @@ export default class ProjectService {
 
     async update(id, payload) {
         try {
+            const projectId = await this.resolveProjectId(id);
+            const normalizedPayload = await this.normalizeProjectPayloadIds(
+                payload || {},
+            );
             const {
                 project_members: projectMembers,
                 vendor_ids: vendorIds,
                 ...rest
-            } = payload || {};
+            } = normalizedPayload || {};
             const project = await this.sequelize.transaction(async (t) => {
                 const existing = await this.Project.findOne({
-                    where: { id, deleted_at: null },
+                    where: { id: projectId, deleted_at: null },
                     transaction: t,
                 });
                 if (!existing) {
@@ -494,6 +600,7 @@ export default class ProjectService {
         search = "",
     } = {}) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
             const safePage = Math.max(Number(page) || 1, 1);
             const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 200);
             const offset = (safePage - 1) * safeLimit;
@@ -507,7 +614,7 @@ export default class ProjectService {
             const orderBy = sortMap[sortBy] || sortMap.title;
             const trimmedSearch = String(search || "").trim();
             const where = {
-                project_id: Number(projectId),
+                project_id: normalizedProjectId,
             };
             where.deleted_at = null;
             where.deleted_at = null;
@@ -538,6 +645,10 @@ export default class ProjectService {
     async listMembers({ projectId, excludeMemberId = null } = {}) {
         try {
             if (!projectId) return [];
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const normalizedExcludeMemberId = excludeMemberId
+                ? await this.resolveMemberId(excludeMemberId, "exclude_member_id")
+                : null;
             const rowsSql = `
             SELECT
                 m.id,
@@ -559,9 +670,9 @@ export default class ProjectService {
                 (await this.sequelize.query(rowsSql, {
                     type: QueryTypes.SELECT,
                     replacements: {
-                        projectId: Number(projectId),
-                        ...(excludeMemberId
-                            ? { excludeMemberId: Number(excludeMemberId) }
+                        projectId: normalizedProjectId,
+                        ...(normalizedExcludeMemberId
+                            ? { excludeMemberId: normalizedExcludeMemberId }
                             : {}),
                     },
                 })) || [];
@@ -585,10 +696,12 @@ export default class ProjectService {
 
     async softDeleteProjectFile(projectId, fileId, deletedBy = null) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const normalizedFileId = await this.resolveFileId(fileId, "fileId");
             const file = await this.ProjectFile.findOne({
                 where: {
-                    id: Number(fileId),
-                    project_id: Number(projectId),
+                    id: normalizedFileId,
+                    project_id: normalizedProjectId,
                     deleted_at: null,
                 },
             });
@@ -609,7 +722,7 @@ export default class ProjectService {
                     { deleted_at: deletedAt },
                     {
                         where: {
-                            project_id: Number(projectId),
+                            project_id: normalizedProjectId,
                             path: { [Sequelize.Op.like]: `${file.path}/%` },
                             deleted_at: null,
                         },
@@ -625,15 +738,16 @@ export default class ProjectService {
 
     async createMilestone(projectId, payload = {}) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
             const title = String(payload.title || "").trim();
             if (!title) {
                 const err = new Error("Milestone title is required");
                 err.statusCode = 400;
                 throw err;
             }
-            await this.getById(projectId);
+            await this.getById(normalizedProjectId);
             return this.Milestone.create({
-                project_id: Number(projectId),
+                project_id: normalizedProjectId,
                 title,
                 due_date: payload.due_date || null,
                 status: payload.status || "PENDING",
@@ -646,10 +760,15 @@ export default class ProjectService {
 
     async updateMilestone(projectId, milestoneId, payload = {}) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const normalizedMilestoneId = await this.resolveMilestoneId(
+                milestoneId,
+                "milestoneId",
+            );
             const milestone = await this.Milestone.findOne({
                 where: {
-                    id: Number(milestoneId),
-                    project_id: Number(projectId),
+                    id: normalizedMilestoneId,
+                    project_id: normalizedProjectId,
                 },
             });
             if (!milestone) {
@@ -686,10 +805,15 @@ export default class ProjectService {
 
     async deleteMilestone(projectId, milestoneId) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const normalizedMilestoneId = await this.resolveMilestoneId(
+                milestoneId,
+                "milestoneId",
+            );
             const milestone = await this.Milestone.findOne({
                 where: {
-                    id: Number(milestoneId),
-                    project_id: Number(projectId),
+                    id: normalizedMilestoneId,
+                    project_id: normalizedProjectId,
                 },
             });
             if (!milestone) {
@@ -725,6 +849,7 @@ export default class ProjectService {
         search = "",
     } = {}) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
             const safePage = Math.max(Number(page) || 1, 1);
             const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 200);
             const offset = (safePage - 1) * safeLimit;
@@ -760,7 +885,7 @@ export default class ProjectService {
                     {
                         type: QueryTypes.SELECT,
                         replacements: {
-                            projectId: Number(projectId),
+                            projectId: normalizedProjectId,
                             limit: safeLimit,
                             offset,
                             ...(trimmedSearch
@@ -784,7 +909,7 @@ export default class ProjectService {
                     {
                         type: QueryTypes.SELECT,
                         replacements: {
-                            projectId: Number(projectId),
+                            projectId: normalizedProjectId,
                             ...(trimmedSearch
                                 ? { search: `%${trimmedSearch}%` }
                                 : {}),
@@ -843,8 +968,10 @@ export default class ProjectService {
                 "p.deleted_at IS NULL",
             ];
             const replacements = {};
-            const safeProjectId = Number(projectId) || 0;
-            if (safeProjectId > 0) {
+            const safeProjectId = projectId
+                ? await this.resolveProjectId(projectId)
+                : 0;
+            if (safeProjectId) {
                 whereParts.push("m.project_id = :projectId");
                 replacements.projectId = safeProjectId;
             } else {
@@ -873,8 +1000,10 @@ export default class ProjectService {
                 replacements.priority = normalizedPriority;
             }
 
-            const safeMemberId = Number(memberId) || 0;
-            if (safeMemberId > 0) {
+            const safeMemberId = memberId
+                ? await this.resolveMemberId(memberId, "member_id")
+                : 0;
+            if (safeMemberId) {
                 whereParts.push("t.owner_id = :memberId");
                 replacements.memberId = safeMemberId;
             } else if (String(memberScope || "").toLowerCase() === "me") {
@@ -925,14 +1054,18 @@ export default class ProjectService {
 
     async createTask(projectId, payload = {}) {
         try {
-            const milestoneId = Number(payload.milestone_id);
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const milestoneId = await this.resolveMilestoneId(
+                payload.milestone_id,
+                "milestone_id",
+            );
             if (!milestoneId) {
                 const err = new Error("Milestone is required");
                 err.statusCode = 400;
                 throw err;
             }
             const milestone = await this.Milestone.findOne({
-                where: { id: milestoneId, project_id: Number(projectId) },
+                where: { id: milestoneId, project_id: normalizedProjectId },
             });
             if (!milestone) {
                 const err = new Error("Milestone not found");
@@ -948,7 +1081,7 @@ export default class ProjectService {
             const ownerId =
                 payload.owner_id === null || payload.owner_id === ""
                     ? null
-                    : Number(payload.owner_id);
+                    : await this.resolveMemberId(payload.owner_id, "owner_id");
             if (payload.owner_id !== undefined && ownerId === 0) {
                 const err = new Error("Owner is invalid");
                 err.statusCode = 400;
@@ -957,7 +1090,7 @@ export default class ProjectService {
             if (ownerId) {
                 const isProjectMember = await this.ProjectMember.findOne({
                     where: {
-                        project_id: Number(projectId),
+                        project_id: normalizedProjectId,
                         member_id: ownerId,
                     },
                 });
@@ -990,8 +1123,10 @@ export default class ProjectService {
 
     async updateTask(projectId, taskId, payload = {}) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const normalizedTaskId = await this.resolveTaskId(taskId, "taskId");
             const task = await this.Task.findOne({
-                where: { id: Number(taskId) },
+                where: { id: normalizedTaskId },
             });
             if (!task) {
                 const err = new Error("Task not found");
@@ -1001,7 +1136,7 @@ export default class ProjectService {
             const currentMilestone = await this.Milestone.findOne({
                 where: {
                     id: Number(task.milestone_id),
-                    project_id: Number(projectId),
+                    project_id: normalizedProjectId,
                 },
             });
             if (!currentMilestone) {
@@ -1011,16 +1146,19 @@ export default class ProjectService {
             }
             const updates = {};
             if (Object.prototype.hasOwnProperty.call(payload, "milestone_id")) {
-                const nextMilestoneId = Number(payload.milestone_id);
-                if (!nextMilestoneId) {
+                const resolvedMilestoneId = await this.resolveMilestoneId(
+                    payload.milestone_id,
+                    "milestone_id",
+                );
+                if (!resolvedMilestoneId) {
                     const err = new Error("Milestone is required");
                     err.statusCode = 400;
                     throw err;
                 }
                 const milestone = await this.Milestone.findOne({
                     where: {
-                        id: nextMilestoneId,
-                        project_id: Number(projectId),
+                        id: resolvedMilestoneId,
+                        project_id: normalizedProjectId,
                     },
                 });
                 if (!milestone) {
@@ -1028,7 +1166,7 @@ export default class ProjectService {
                     err.statusCode = 404;
                     throw err;
                 }
-                updates.milestone_id = nextMilestoneId;
+                updates.milestone_id = resolvedMilestoneId;
             }
             if (Object.prototype.hasOwnProperty.call(payload, "title")) {
                 const title = String(payload.title || "").trim();
@@ -1059,7 +1197,7 @@ export default class ProjectService {
                 const ownerId =
                     payload.owner_id === null || payload.owner_id === ""
                         ? null
-                        : Number(payload.owner_id);
+                        : await this.resolveMemberId(payload.owner_id, "owner_id");
                 if (payload.owner_id !== undefined && ownerId === 0) {
                     const err = new Error("Owner is invalid");
                     err.statusCode = 400;
@@ -1068,7 +1206,7 @@ export default class ProjectService {
                 if (ownerId) {
                     const isProjectMember = await this.ProjectMember.findOne({
                         where: {
-                            project_id: Number(projectId),
+                            project_id: normalizedProjectId,
                             member_id: ownerId,
                         },
                     });
@@ -1093,8 +1231,10 @@ export default class ProjectService {
 
     async deleteTask(projectId, taskId) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const normalizedTaskId = await this.resolveTaskId(taskId, "taskId");
             const task = await this.Task.findOne({
-                where: { id: Number(taskId) },
+                where: { id: normalizedTaskId },
             });
             if (!task) {
                 const err = new Error("Task not found");
@@ -1104,7 +1244,7 @@ export default class ProjectService {
             const milestone = await this.Milestone.findOne({
                 where: {
                     id: Number(task.milestone_id),
-                    project_id: Number(projectId),
+                    project_id: normalizedProjectId,
                 },
             });
             if (!milestone) {
@@ -1129,6 +1269,7 @@ export default class ProjectService {
         search = "",
     } = {}) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
             const safePage = Math.max(Number(page) || 1, 1);
             const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 200);
             const offset = (safePage - 1) * safeLimit;
@@ -1163,7 +1304,7 @@ export default class ProjectService {
                     {
                         type: QueryTypes.SELECT,
                         replacements: {
-                            projectId: Number(projectId),
+                            projectId: normalizedProjectId,
                             limit: safeLimit,
                             offset,
                             ...(trimmedSearch
@@ -1186,7 +1327,7 @@ export default class ProjectService {
                     {
                         type: QueryTypes.SELECT,
                         replacements: {
-                            projectId: Number(projectId),
+                            projectId: normalizedProjectId,
                             ...(trimmedSearch
                                 ? { search: `%${trimmedSearch}%` }
                                 : {}),
@@ -1215,6 +1356,7 @@ export default class ProjectService {
         search = "",
     } = {}) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
             const safePage = Math.max(Number(page) || 1, 1);
             const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 200);
             const offset = (safePage - 1) * safeLimit;
@@ -1229,7 +1371,7 @@ export default class ProjectService {
             const orderBy = sortMap[sortBy] || sortMap.entry_date;
             const trimmedSearch = String(search || "").trim();
             const where = {
-                project_id: Number(projectId),
+                project_id: normalizedProjectId,
                 deleted_at: null,
             };
             if (trimmedSearch) {
@@ -1257,6 +1399,7 @@ export default class ProjectService {
 
     async createFinance(projectId, payload = {}) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
             const entryDate = String(payload.entry_date || "").trim();
             if (!entryDate) {
                 const err = new Error("Finance date is required");
@@ -1282,7 +1425,7 @@ export default class ProjectService {
             }
 
             const project = await this.Project.findOne({
-                where: { id: Number(projectId), deleted_at: null },
+                where: { id: normalizedProjectId, deleted_at: null },
             });
             if (!project) {
                 const err = new Error("Project not found");
@@ -1310,7 +1453,7 @@ export default class ProjectService {
                         ],
                     ],
                     where: {
-                        project_id: Number(projectId),
+                        project_id: normalizedProjectId,
                         deleted_at: null,
                     },
                     raw: true,
@@ -1338,7 +1481,7 @@ export default class ProjectService {
             return this.sequelize.transaction(async (t) => {
                 const finance = await this.ProjectFinance.create(
                     {
-                        project_id: Number(projectId),
+                        project_id: normalizedProjectId,
                         entry_date: entryDate,
                         fund_allocated: allocated,
                         fund_consumed: consumed,
@@ -1363,10 +1506,15 @@ export default class ProjectService {
 
     async updateFinance(projectId, financeId, payload = {}) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const normalizedFinanceId = await this.resolveFinanceId(
+                financeId,
+                "financeId",
+            );
             const finance = await this.ProjectFinance.findOne({
                 where: {
-                    id: Number(financeId),
-                    project_id: Number(projectId),
+                    id: normalizedFinanceId,
+                    project_id: normalizedProjectId,
                     deleted_at: null,
                 },
             });
@@ -1426,7 +1574,7 @@ export default class ProjectService {
             }
 
             const project = await this.Project.findOne({
-                where: { id: Number(projectId), deleted_at: null },
+                where: { id: normalizedProjectId, deleted_at: null },
             });
             if (!project) {
                 const err = new Error("Project not found");
@@ -1454,7 +1602,7 @@ export default class ProjectService {
                         ],
                     ],
                     where: {
-                        project_id: Number(projectId),
+                        project_id: normalizedProjectId,
                         deleted_at: null,
                     },
                     raw: true,
@@ -1505,10 +1653,15 @@ export default class ProjectService {
 
     async deleteFinance(projectId, financeId) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const normalizedFinanceId = await this.resolveFinanceId(
+                financeId,
+                "financeId",
+            );
             const finance = await this.ProjectFinance.findOne({
                 where: {
-                    id: Number(financeId),
-                    project_id: Number(projectId),
+                    id: normalizedFinanceId,
+                    project_id: normalizedProjectId,
                     deleted_at: null,
                 },
             });
@@ -1518,7 +1671,7 @@ export default class ProjectService {
                 throw err;
             }
             const project = await this.Project.findOne({
-                where: { id: Number(projectId), deleted_at: null },
+                where: { id: normalizedProjectId, deleted_at: null },
             });
             if (!project) {
                 const err = new Error("Project not found");
@@ -1542,7 +1695,7 @@ export default class ProjectService {
                         ],
                     ],
                     where: {
-                        project_id: Number(projectId),
+                        project_id: normalizedProjectId,
                         deleted_at: null,
                     },
                     raw: true,
@@ -1577,7 +1730,8 @@ export default class ProjectService {
 
     async createAction(projectId, payload = {}) {
         try {
-            const taskId = Number(payload.task_id);
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const taskId = await this.resolveTaskId(payload.task_id, "task_id");
             if (!taskId) {
                 const err = new Error("Task is required");
                 err.statusCode = 400;
@@ -1593,7 +1747,7 @@ export default class ProjectService {
         `,
                 {
                     type: QueryTypes.SELECT,
-                    replacements: { taskId, projectId: Number(projectId) },
+                    replacements: { taskId, projectId: normalizedProjectId },
                 },
             );
             if (!task.length) {
@@ -1607,10 +1761,11 @@ export default class ProjectService {
                 err.statusCode = 400;
                 throw err;
             }
+            const ownerId = await this.resolveMemberId(payload.owner_id, "owner_id");
             return this.Action.create({
                 task_id: taskId,
                 title,
-                owner_id: payload.owner_id || null,
+                owner_id: ownerId || null,
                 due_date: payload.due_date || null,
                 status: payload.status || "OPEN",
             });
@@ -1628,12 +1783,13 @@ export default class ProjectService {
         parentId = null,
     } = {}) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
             const safePage = Math.max(Number(page) || 1, 1);
             const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 200);
             const offset = (safePage - 1) * safeLimit;
             const trimmedSearch = String(search || "").trim();
             const where = {
-                project_id: Number(projectId),
+                project_id: normalizedProjectId,
                 deleted_at: null,
             };
             if (
@@ -1644,7 +1800,7 @@ export default class ProjectService {
             ) {
                 where.parent_id = null;
             } else {
-                where.parent_id = Number(parentId);
+                where.parent_id = await this.resolveFileId(parentId, "parent_id");
             }
             if (trimmedSearch) {
                 where[Sequelize.Op.or] = [
@@ -1675,10 +1831,12 @@ export default class ProjectService {
 
     async getProjectFileForDownload(projectId, fileId) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            const normalizedFileId = await this.resolveFileId(fileId, "fileId");
             const file = await this.ProjectFile.findOne({
                 where: {
-                    id: Number(fileId),
-                    project_id: Number(projectId),
+                    id: normalizedFileId,
+                    project_id: normalizedProjectId,
                     deleted_at: null,
                 },
             });
@@ -1709,13 +1867,14 @@ export default class ProjectService {
 
     async createProjectFolder(projectId, payload = {}, uploadedBy = null) {
         try {
+            const normalizedProjectId = await this.resolveProjectId(projectId);
             const displayName = String(payload.name || "").trim();
             if (!displayName) {
                 const err = new Error("Folder name is required");
                 err.statusCode = 400;
                 throw err;
             }
-            await this.getById(projectId);
+            await this.getById(normalizedProjectId);
 
             const shareScope =
                 payload.share_scope &&
@@ -1731,13 +1890,13 @@ export default class ProjectService {
             let parent = null;
             const parentId =
                 payload.parent_id && payload.parent_id !== "null"
-                    ? Number(payload.parent_id)
+                    ? await this.resolveFileId(payload.parent_id, "parent_id")
                     : null;
             if (parentId) {
                 parent = await this.ProjectFile.findOne({
                     where: {
                         id: parentId,
-                        project_id: Number(projectId),
+                        project_id: normalizedProjectId,
                     },
                 });
                 if (!parent || !parent.is_folder) {
@@ -1747,7 +1906,7 @@ export default class ProjectService {
                 }
             }
 
-            const basePath = `/upload/projects/${projectId}`;
+            const basePath = `/upload/projects/${normalizedProjectId}`;
             const parentRelative = parent
                 ? parent.path.replace(`${basePath}/`, "")
                 : "";
@@ -1757,14 +1916,14 @@ export default class ProjectService {
             const diskDir = path.join(
                 uploadRoot,
                 "projects",
-                String(projectId),
+                String(normalizedProjectId),
                 ...(parentRelative ? parentRelative.split("/") : []),
                 folderSlug,
             );
             await fs.mkdir(diskDir, { recursive: true });
 
             return this.ProjectFile.create({
-                project_id: Number(projectId),
+                project_id: normalizedProjectId,
                 parent_id: parent ? parent.id : null,
                 uploaded_by: uploadedBy,
                 name: displayName,
@@ -1791,7 +1950,8 @@ export default class ProjectService {
                 err.statusCode = 400;
                 throw err;
             }
-            await this.getById(projectId);
+            const normalizedProjectId = await this.resolveProjectId(projectId);
+            await this.getById(normalizedProjectId);
 
             const shareScope =
                 fields.share_scope &&
@@ -1820,13 +1980,13 @@ export default class ProjectService {
             let parent = null;
             const parentId =
                 fields.parent_id && fields.parent_id !== "null"
-                    ? fields.parent_id
+                    ? await this.resolveFileId(fields.parent_id, "parent_id")
                     : null;
             if (parentId) {
                 parent = await this.ProjectFile.findOne({
                     where: {
-                        id: Number(parentId),
-                        project_id: Number(projectId),
+                        id: parentId,
+                        project_id: normalizedProjectId,
                     },
                 });
                 if (!parent || !parent.is_folder) {
@@ -1837,7 +1997,7 @@ export default class ProjectService {
             }
 
             const buffer = filePart.buffer;
-            const basePath = `/upload/projects/${projectId}`;
+            const basePath = `/upload/projects/${normalizedProjectId}`;
             const parentRelative = parent
                 ? parent.path.replace(`${basePath}/`, "")
                 : "";
@@ -1847,7 +2007,7 @@ export default class ProjectService {
             const diskDir = path.join(
                 uploadRoot,
                 "projects",
-                String(projectId),
+                String(normalizedProjectId),
                 ...(parentRelative ? parentRelative.split("/") : []),
             );
             await fs.mkdir(diskDir, { recursive: true });
@@ -1855,7 +2015,7 @@ export default class ProjectService {
             await fs.writeFile(diskPath, buffer);
 
             return this.ProjectFile.create({
-                project_id: Number(projectId),
+                project_id: normalizedProjectId,
                 parent_id: parent ? parent.id : null,
                 uploaded_by: uploadedBy,
                 name: safeName,

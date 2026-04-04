@@ -8,6 +8,11 @@ import sharp from "sharp";
 import initModels from "../../models/index.js";
 import { env, logger } from "../../config/index.js";
 import { getEmailQueue } from "../../queues/email.queue.js";
+import {
+    hashIdFields,
+    resolveIdFromModel,
+    resolveOptionalIdFromModel,
+} from "../../lib/id-hash.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -30,6 +35,7 @@ export default class MemberService {
         this.User = models.User;
         this.UserRole = models.UserRole;
         this.Role = models.Role;
+        this.Department = models.Department;
     }
 
     normalizeAvatarPath(member) {
@@ -70,6 +76,9 @@ export default class MemberService {
         search = "",
         projectMember = null,
     } = {}) {
+        const projectMemberId = projectMember
+            ? await resolveIdFromModel(this.Member, projectMember, "project_member")
+            : null;
         const safePage = Math.max(Number(page) || 1, 1);
         const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 200);
         const offset = (safePage - 1) * safeLimit;
@@ -146,7 +155,7 @@ export default class MemberService {
                     offset,
                     ...(likeSearch ? { search: likeSearch } : {}),
                     ...(projectMember
-                        ? { projectMemberId: Number(projectMember) }
+                        ? { projectMemberId }
                         : {}),
                 },
             })) || [];
@@ -168,13 +177,15 @@ export default class MemberService {
                 replacements: {
                     ...(likeSearch ? { search: likeSearch } : {}),
                     ...(projectMember
-                        ? { projectMemberId: Number(projectMember) }
+                        ? { projectMemberId }
                         : {}),
                 },
             })) || [];
 
         return {
-            rows: rows.map((row) => this.normalizeAvatarPath(row)),
+            rows: hashIdFields(
+                rows.map((row) => this.normalizeAvatarPath(row)),
+            ),
             total: Number(total) || 0,
             page: safePage,
             limit: safeLimit,
@@ -182,7 +193,7 @@ export default class MemberService {
     }
 
     async getById(id) {
-        console.log("Member ID:", id);
+        const memberId = await resolveIdFromModel(this.Member, id, "id");
 
         const [member] =
             (await this.sequelize.query(
@@ -215,7 +226,7 @@ export default class MemberService {
             `,
                 {
                     type: QueryTypes.SELECT,
-                    replacements: { id },
+                    replacements: { id: memberId },
                 },
             )) || [];
 
@@ -242,7 +253,7 @@ export default class MemberService {
             `,
                 {
                     type: QueryTypes.SELECT,
-                    replacements: { id },
+                    replacements: { id: memberId },
                 },
             )) || [];
 
@@ -267,7 +278,7 @@ export default class MemberService {
             `,
                 {
                     type: QueryTypes.SELECT,
-                    replacements: { id },
+                    replacements: { id: memberId },
                 },
             )) || [];
 
@@ -296,10 +307,20 @@ export default class MemberService {
             },
         };
 
-        return normalizedMember;
+        return hashIdFields(normalizedMember);
     }
 
     async create(payload, avatarFile = null) {
+        const departmentId = await resolveOptionalIdFromModel(
+            this.Department,
+            payload?.department_id,
+            "department_id",
+        );
+        const roleId = await resolveOptionalIdFromModel(
+            this.Role,
+            payload?.role_id,
+            "role_id",
+        );
         const t = await this.sequelize.transaction();
         try {
             const {
@@ -309,9 +330,7 @@ export default class MemberService {
                 secondary_phone,
                 whatsapp,
                 designation,
-                department_id,
                 username,
-                role_id,
             } = payload;
 
             const member = await this.Member.create(
@@ -322,7 +341,7 @@ export default class MemberService {
                     secondary_phone: secondary_phone || null,
                     whatsapp: whatsapp || null,
                     designation: designation || null,
-                    department_id: department_id || null,
+                    department_id: departmentId || null,
                 },
                 { transaction: t },
             );
@@ -336,15 +355,15 @@ export default class MemberService {
                     username,
                     email,
                     password_hash,
-                    department_id: department_id || null,
+                    department_id: departmentId || null,
                     is_active: 1,
                 },
                 { transaction: t },
             );
 
             let roleName = "";
-            if (role_id) {
-                const role = await this.Role.findByPk(role_id);
+            if (roleId) {
+                const role = await this.Role.findByPk(roleId);
                 roleName = role?.name || role?.slug || "";
                 await this.UserRole.destroy({
                     where: { user_id: user.id },
@@ -353,8 +372,8 @@ export default class MemberService {
                 await this.UserRole.create(
                     {
                         user_id: user.id,
-                        role_id,
-                        department_id: department_id || 0,
+                        role_id: roleId,
+                        department_id: departmentId || 0,
                     },
                     { transaction: t },
                 );
@@ -381,7 +400,7 @@ export default class MemberService {
                 },
             ).catch((err) => logger.error({ err }, "Failed to enqueue email"));
             this.normalizeAvatarPath(member);
-            return member;
+            return hashIdFields(member);
         } catch (err) {
             await t.rollback();
             throw err;
@@ -389,9 +408,10 @@ export default class MemberService {
     }
 
     async update(id, payload, avatarFile = null) {
+        const memberId = await resolveIdFromModel(this.Member, id, "id");
         const t = await this.sequelize.transaction();
         try {
-            const member = await this.Member.findByPk(id, { transaction: t });
+            const member = await this.Member.findByPk(memberId, { transaction: t });
             if (!member) {
                 const err = new Error("Member not found");
                 err.statusCode = 404;
@@ -399,9 +419,24 @@ export default class MemberService {
             }
 
             const user = await this.User.findOne({
-                where: { member_id: id, deleted_at: null },
+                where: { member_id: memberId, deleted_at: null },
                 transaction: t,
             });
+
+            const hasDepartment =
+                Object.prototype.hasOwnProperty.call(payload || {}, "department_id");
+            const hasRole =
+                Object.prototype.hasOwnProperty.call(payload || {}, "role_id");
+            const departmentId = hasDepartment
+                ? await resolveOptionalIdFromModel(
+                      this.Department,
+                      payload?.department_id,
+                      "department_id",
+                  )
+                : undefined;
+            const roleId = hasRole
+                ? await resolveOptionalIdFromModel(this.Role, payload?.role_id, "role_id")
+                : undefined;
 
             const {
                 full_name,
@@ -410,9 +445,7 @@ export default class MemberService {
                 secondary_phone,
                 whatsapp,
                 designation,
-                department_id,
                 username,
-                role_id,
             } = payload;
 
             member.set({
@@ -430,8 +463,8 @@ export default class MemberService {
                         ? designation || null
                         : member.designation,
                 department_id:
-                    department_id !== undefined
-                        ? department_id || null
+                    hasDepartment
+                        ? departmentId || null
                         : member.department_id,
             });
             await member.save({ transaction: t });
@@ -441,13 +474,13 @@ export default class MemberService {
                     username: username ?? user.username,
                     email: email ?? user.email,
                     department_id:
-                        department_id !== undefined
-                            ? department_id || null
+                        hasDepartment
+                            ? departmentId || null
                             : user.department_id,
                 });
                 await user.save({ transaction: t });
 
-                if (role_id) {
+                if (hasRole && roleId) {
                     await this.UserRole.destroy({
                         where: { user_id: user.id },
                         transaction: t,
@@ -455,8 +488,8 @@ export default class MemberService {
                     await this.UserRole.create(
                         {
                             user_id: user.id,
-                            role_id,
-                            department_id: department_id || 0,
+                            role_id: roleId,
+                            department_id: (hasDepartment ? departmentId : user.department_id) || 0,
                         },
                         { transaction: t },
                     );
@@ -469,7 +502,7 @@ export default class MemberService {
 
             await t.commit();
             this.normalizeAvatarPath(member);
-            return member;
+            return hashIdFields(member);
         } catch (err) {
             await t.rollback();
             throw err;
@@ -477,9 +510,10 @@ export default class MemberService {
     }
 
     async delete(id) {
+        const memberId = await resolveIdFromModel(this.Member, id, "id");
         const t = await this.sequelize.transaction();
         try {
-            const member = await this.Member.findByPk(id, { transaction: t });
+            const member = await this.Member.findByPk(memberId, { transaction: t });
             if (!member) {
                 const err = new Error("Member not found");
                 err.statusCode = 404;
@@ -487,7 +521,7 @@ export default class MemberService {
             }
 
             const user = await this.User.findOne({
-                where: { member_id: id },
+                where: { member_id: memberId },
                 transaction: t,
             });
 

@@ -1240,20 +1240,44 @@ export default function ProjectView() {
                             <p className="text-xs uppercase tracking-[0.2em] auth-accent">
                                 Owner
                             </p>
-                            <p className="mt-2 break-words text-sm auth-text-primary">
+                            <div className="mt-2 min-w-0 text-sm auth-text-primary">
                                 {project.owner?.member?.full_name ||
                                 project.owner_name ? (
-                                    <Link
-                                        to={`/members/${project.owner_id}`}
-                                        className="underline underline-offset-4"
-                                    >
-                                        {project.owner?.member?.full_name ||
-                                            project.owner_name}
-                                    </Link>
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-8 w-8 overflow-hidden rounded-full border border-white/10 bg-slate-800/70 flex items-center justify-center">
+                                            {project.owner?.member?.avatar_path ? (
+                                                <img
+                                                    src={
+                                                        project.owner.member
+                                                            .avatar_path
+                                                    }
+                                                    alt={
+                                                        project.owner?.member
+                                                            ?.full_name ||
+                                                        project.owner_name ||
+                                                        "Owner avatar"
+                                                    }
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            ) : (
+                                                <UserRound
+                                                    size={14}
+                                                    className="text-slate-400"
+                                                />
+                                            )}
+                                        </div>
+                                        <Link
+                                            to={`/members/${project.owner_id}`}
+                                            className="truncate underline underline-offset-4"
+                                        >
+                                            {project.owner?.member?.full_name ||
+                                                project.owner_name}
+                                        </Link>
+                                    </div>
                                 ) : (
                                     `#${project.owner_id}`
                                 )}
-                            </p>
+                            </div>
                         </div>
 
                         <div className="rounded-2xl border auth-border auth-surface p-4">

@@ -204,7 +204,7 @@ export default function MembersList() {
                         </button>
                     </div>
                 </div>
-                <div className="hidden bg-white/5 px-6 py-3 text-xs tracking-[0.2em] auth-accent md:grid md:grid-cols-7">
+                <div className="hidden bg-white/5 px-6 py-3 text-xs tracking-[0.2em] auth-accent md:grid md:grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,0.7fr)_auto]">
                     <button
                         type="button"
                         onClick={() => toggleSort("name")}
@@ -261,7 +261,7 @@ export default function MembersList() {
                         {members.map((member) => (
                             <div
                                 key={member.id}
-                                className="grid items-center gap-2 px-4 py-4 md:grid-cols-7 md:px-6"
+                                className="grid items-center gap-2 px-4 py-4 md:grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,0.7fr)_auto] md:px-6"
                             >
                                 <div className="col-span-2 flex items-center gap-3">
                                     <div className="h-9 w-9 rounded-full overflow-hidden bg-slate-800/70 flex items-center justify-center border border-white/10">

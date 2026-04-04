@@ -1,6 +1,7 @@
 import { createReadStream } from "fs";
 import archiver from "archiver";
 import ProjectService from "./project.service.js";
+import { hashIdFields, toMd5 } from "../../lib/id-hash.js";
 
 function getSafeDownloadName(name, fallback = "file") {
     const safeBase = String(name || fallback).trim() || fallback;
@@ -55,7 +56,7 @@ export async function listProjects(req, reply) {
         });
     }
     return reply.send({
-        projects: normalized,
+        projects: hashIdFields(normalized),
         pagination: {
             page: currentPage,
             limit: pageLimit,
@@ -67,32 +68,32 @@ export async function listProjects(req, reply) {
 
 export async function getProject(req, reply) {
     const service = new ProjectService(req.server?.db);
-    const project = await service.getById(req.params.id);
-    return reply.send({ project });
+    const project = await service.getById(toMd5(req.params.id));
+    return reply.send({ project: hashIdFields(project) });
 }
 
 export async function createProject(req, reply) {
     const service = new ProjectService(req.server?.db);
     const project = await service.create(req.body);
-    return reply.code(201).send({ project });
+    return reply.code(201).send({ project: hashIdFields(project) });
 }
 
 export async function updateProject(req, reply) {
     const service = new ProjectService(req.server?.db);
-    const project = await service.update(req.params.id, req.body);
-    return reply.send({ project });
+    const project = await service.update(toMd5(req.params.id), req.body);
+    return reply.send({ project: hashIdFields(project) });
 }
 
 export async function deleteProject(req, reply) {
     const service = new ProjectService(req.server?.db);
-    const result = await service.softDelete(req.params.id);
+    const result = await service.softDelete(toMd5(req.params.id));
     return reply.send(result);
 }
 
 export async function listProjectMilestones(req, reply) {
     const service = new ProjectService(req.server?.db);
     const { rows, total, page, limit } = await service.listMilestones({
-        projectId: req.params.id,
+        projectId: toMd5(req.params.id),
         page: req.query?.page,
         limit: req.query?.limit,
         sortBy: req.query?.sortBy,
@@ -112,7 +113,7 @@ export async function listProjectMilestones(req, reply) {
         });
     }
     return reply.send({
-        milestones: rows,
+        milestones: hashIdFields(rows),
         pagination: {
             page,
             limit,
@@ -126,33 +127,33 @@ export async function listProjectMembers(req, reply) {
     const service = new ProjectService(req.server?.db);
     const excludeMemberId = req.query?.exclude_member_id;
     const members = await service.listMembers({
-        projectId: req.params.id,
-        excludeMemberId,
+        projectId: toMd5(req.params.id),
+        excludeMemberId: excludeMemberId ? toMd5(excludeMemberId) : excludeMemberId,
     });
-    return reply.send({ members });
+    return reply.send({ members: hashIdFields(members) });
 }
 
 export async function createProjectMilestone(req, reply) {
     const service = new ProjectService(req.server?.db);
-    const milestone = await service.createMilestone(req.params.id, req.body);
-    return reply.code(201).send({ milestone });
+    const milestone = await service.createMilestone(toMd5(req.params.id), req.body);
+    return reply.code(201).send({ milestone: hashIdFields(milestone) });
 }
 
 export async function updateProjectMilestone(req, reply) {
     const service = new ProjectService(req.server?.db);
     const milestone = await service.updateMilestone(
-        req.params.id,
-        req.params.milestoneId,
+        toMd5(req.params.id),
+        toMd5(req.params.milestoneId),
         req.body,
     );
-    return reply.send({ milestone });
+    return reply.send({ milestone: hashIdFields(milestone) });
 }
 
 export async function deleteProjectMilestone(req, reply) {
     const service = new ProjectService(req.server?.db);
     const result = await service.deleteMilestone(
-        req.params.id,
-        req.params.milestoneId,
+        toMd5(req.params.id),
+        toMd5(req.params.milestoneId),
     );
     return reply.send(result);
 }
@@ -160,7 +161,7 @@ export async function deleteProjectMilestone(req, reply) {
 export async function listProjectTasks(req, reply) {
     const service = new ProjectService(req.server?.db);
     const { rows, total, page, limit } = await service.listTasks({
-        projectId: req.params.id,
+        projectId: toMd5(req.params.id),
         page: req.query?.page,
         limit: req.query?.limit,
         sortBy: req.query?.sortBy,
@@ -180,7 +181,7 @@ export async function listProjectTasks(req, reply) {
         });
     }
     return reply.send({
-        tasks: rows,
+        tasks: hashIdFields(rows),
         pagination: {
             page,
             limit,
@@ -193,8 +194,8 @@ export async function listProjectTasks(req, reply) {
 export async function listTaskDashboard(req, reply) {
     const service = new ProjectService(req.server?.db);
     const summary = await service.getTaskDashboardSummary({
-        projectId: req.query?.project_id,
-        memberId: req.query?.member_id,
+        projectId: req.query?.project_id ? toMd5(req.query.project_id) : req.query?.project_id,
+        memberId: req.query?.member_id ? toMd5(req.query.member_id) : req.query?.member_id,
         memberScope: req.query?.member_scope,
         status: req.query?.status,
         priority: req.query?.priority,
@@ -205,30 +206,30 @@ export async function listTaskDashboard(req, reply) {
 
 export async function createProjectTask(req, reply) {
     const service = new ProjectService(req.server?.db);
-    const task = await service.createTask(req.params.id, req.body);
-    return reply.code(201).send({ task });
+    const task = await service.createTask(toMd5(req.params.id), req.body);
+    return reply.code(201).send({ task: hashIdFields(task) });
 }
 
 export async function updateProjectTask(req, reply) {
     const service = new ProjectService(req.server?.db);
     const task = await service.updateTask(
-        req.params.id,
-        req.params.taskId,
+        toMd5(req.params.id),
+        toMd5(req.params.taskId),
         req.body,
     );
-    return reply.send({ task });
+    return reply.send({ task: hashIdFields(task) });
 }
 
 export async function deleteProjectTask(req, reply) {
     const service = new ProjectService(req.server?.db);
-    const result = await service.deleteTask(req.params.id, req.params.taskId);
+    const result = await service.deleteTask(toMd5(req.params.id), toMd5(req.params.taskId));
     return reply.send(result);
 }
 
 export async function listProjectActions(req, reply) {
     const service = new ProjectService(req.server?.db);
     const { rows, total, page, limit } = await service.listActions({
-        projectId: req.params.id,
+        projectId: toMd5(req.params.id),
         page: req.query?.page,
         limit: req.query?.limit,
         sortBy: req.query?.sortBy,
@@ -248,7 +249,7 @@ export async function listProjectActions(req, reply) {
         });
     }
     return reply.send({
-        actions: rows,
+        actions: hashIdFields(rows),
         pagination: {
             page,
             limit,
@@ -261,7 +262,7 @@ export async function listProjectActions(req, reply) {
 export async function listProjectFinances(req, reply) {
     const service = new ProjectService(req.server?.db);
     const { rows, total, page, limit } = await service.listFinances({
-        projectId: req.params.id,
+        projectId: toMd5(req.params.id),
         page: req.query?.page,
         limit: req.query?.limit,
         sortBy: req.query?.sortBy,
@@ -281,7 +282,7 @@ export async function listProjectFinances(req, reply) {
         });
     }
     return reply.send({
-        finances: rows,
+        finances: hashIdFields(rows),
         pagination: {
             page,
             limit,
@@ -293,43 +294,50 @@ export async function listProjectFinances(req, reply) {
 
 export async function createProjectFinance(req, reply) {
     const service = new ProjectService(req.server?.db);
-    const finance = await service.createFinance(req.params.id, req.body);
-    return reply.code(201).send({ finance });
+    const finance = await service.createFinance(toMd5(req.params.id), req.body);
+    return reply.code(201).send({ finance: hashIdFields(finance) });
 }
 
 export async function updateProjectFinance(req, reply) {
     const service = new ProjectService(req.server?.db);
     const finance = await service.updateFinance(
-        req.params.id,
-        req.params.financeId,
+        toMd5(req.params.id),
+        toMd5(req.params.financeId),
         req.body,
     );
-    return reply.send({ finance });
+    return reply.send({ finance: hashIdFields(finance) });
 }
 
 export async function deleteProjectFinance(req, reply) {
     const service = new ProjectService(req.server?.db);
     const result = await service.deleteFinance(
-        req.params.id,
-        req.params.financeId,
+        toMd5(req.params.id),
+        toMd5(req.params.financeId),
     );
     return reply.send(result);
 }
 
 export async function createProjectAction(req, reply) {
     const service = new ProjectService(req.server?.db);
-    const action = await service.createAction(req.params.id, req.body);
-    return reply.code(201).send({ action });
+    const action = await service.createAction(toMd5(req.params.id), req.body);
+    return reply.code(201).send({ action: hashIdFields(action) });
 }
 
 export async function listProjectFiles(req, reply) {
     const service = new ProjectService(req.server?.db);
+    const parentIdRaw = req.query?.parent_id;
     const { rows, total, page, limit } = await service.listProjectFiles({
-        projectId: req.params.id,
+        projectId: toMd5(req.params.id),
         page: req.query?.page,
         limit: req.query?.limit,
         search: req.query?.search,
-        parentId: req.query?.parent_id,
+        parentId:
+            parentIdRaw === null ||
+            parentIdRaw === undefined ||
+            parentIdRaw === "" ||
+            parentIdRaw === "null"
+                ? parentIdRaw
+                : toMd5(parentIdRaw),
     });
     if (!rows.length) {
         return reply.send({
@@ -344,7 +352,7 @@ export async function listProjectFiles(req, reply) {
         });
     }
     return reply.send({
-        files: rows,
+        files: hashIdFields(rows),
         pagination: {
             page,
             limit,
@@ -357,11 +365,11 @@ export async function listProjectFiles(req, reply) {
 export async function createProjectFolder(req, reply) {
     const service = new ProjectService(req.server?.db);
     const folder = await service.createProjectFolder(
-        req.params.id,
+        toMd5(req.params.id),
         req.body,
         req.user?.id || null,
     );
-    return reply.code(201).send({ folder });
+    return reply.code(201).send({ folder: hashIdFields(folder) });
 }
 
 export async function uploadProjectFile(req, reply) {
@@ -385,19 +393,19 @@ export async function uploadProjectFile(req, reply) {
         }
     }
     const file = await service.uploadProjectFile(
-        req.params.id,
+        toMd5(req.params.id),
         filePart,
         fields,
         req.user?.id || null,
     );
-    return reply.code(201).send({ file });
+    return reply.code(201).send({ file: hashIdFields(file) });
 }
 
 export async function deleteProjectFile(req, reply) {
     const service = new ProjectService(req.server?.db);
     const result = await service.softDeleteProjectFile(
-        req.params.id,
-        req.params.fileId,
+        toMd5(req.params.id),
+        toMd5(req.params.fileId),
         req.user?.id || null,
     );
     return reply.send(result);
@@ -406,8 +414,8 @@ export async function deleteProjectFile(req, reply) {
 export async function downloadProjectFile(req, reply) {
     const service = new ProjectService(req.server?.db);
     const { file, diskPath } = await service.getProjectFileForDownload(
-        req.params.id,
-        req.params.fileId,
+        toMd5(req.params.id),
+        toMd5(req.params.fileId),
     );
 
     const baseName = getSafeDownloadName(

@@ -1,4 +1,5 @@
 import MemberService from "./member.service.js";
+import { hashIdFields } from "../../lib/id-hash.js";
 
 async function parseMultipartMember(req) {
     const fields = {};
@@ -98,7 +99,7 @@ export async function listMembers(req, reply) {
 export async function getMember(req, reply) {
     const service = new MemberService(req.server?.db);
     const member = await service.getById(req.params.id);
-    return reply.send({ member });
+    return reply.send({ member: hashIdFields(member) });
 }
 
 export async function createMember(req, reply) {
@@ -114,7 +115,7 @@ export async function createMember(req, reply) {
     const member = await service.create(payload, avatarFile);
     return reply
         .code(201)
-        .send({ member, message: "Member created successfully" });
+        .send({ member: hashIdFields(member), message: "Member created successfully" });
 }
 
 export async function updateMember(req, reply) {
@@ -127,7 +128,7 @@ export async function updateMember(req, reply) {
         avatarFile = parsed.avatarFile;
     }
     const member = await service.update(req.params.id, payload, avatarFile);
-    return reply.send({ member });
+    return reply.send({ member: hashIdFields(member) });
 }
 
 export async function deleteMember(req, reply) {

@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import usePageTitle from "../lib/usePageTitle";
 import { API_ENDPOINTS } from "../lib/apiEndpoints";
 import { apiRequest } from "../lib/apiClient";
+import { md5Hash } from "../utility/helper";
 
 const DEFAULT_FILTERS = {
     project: "all",
@@ -31,8 +32,15 @@ const TASK_TABS = [
 export default function Tasks() {
     usePageTitle("Tasks");
     const { user } = useAuth();
-    const loggedInMemberId =
+    const rawLoggedInMemberId =
         user?.member_id || user?.memberId || user?.id || null;
+    const loggedInMemberId = useMemo(() => {
+        if (!rawLoggedInMemberId) return null;
+        const normalized = String(rawLoggedInMemberId).trim();
+        if (!normalized) return null;
+        if (/^[a-f0-9]{32}$/i.test(normalized)) return normalized.toLowerCase();
+        return md5Hash(normalized);
+    }, [rawLoggedInMemberId]);
     const [projects, setProjects] = useState([]);
     const [members, setMembers] = useState([]);
     const [selectedProject, setSelectedProject] = useState(
@@ -83,27 +91,20 @@ export default function Tasks() {
         let isMounted = true;
         (async () => {
             try {
-                const loggedInMemberId =
-                    user?.member_id || user?.memberId || user?.id || null;
-                const projectUrl = loggedInMemberId
-                    ? API_ENDPOINTS.PROJECT_BY_MEMBER(loggedInMemberId)
-                    : API_ENDPOINTS.PROJECTS;
+                const projectUrl =
+                    API_ENDPOINTS.TASKS_PROJECTS(loggedInMemberId);
                 const pjRes = await apiRequest(projectUrl, "GET");
                 if (!isMounted) return;
                 setProjects(pjRes.projects || pjRes || []);
 
                 let membersUrl;
                 if (selectedProject && selectedProject !== "all") {
-                    membersUrl = API_ENDPOINTS.PROJECT_MEMBERS(
+                    membersUrl = API_ENDPOINTS.TASKS_PROJECT_MEMBERS(
                         selectedProject,
                         loggedInMemberId,
                     );
                 } else {
-                    membersUrl = loggedInMemberId
-                        ? API_ENDPOINTS.MEMBERS_BY_PROJECT_MEMBER(
-                              loggedInMemberId,
-                          )
-                        : API_ENDPOINTS.MEMBERS;
+                    membersUrl = API_ENDPOINTS.TASKS_MEMBERS(loggedInMemberId);
                 }
                 const mbRes = await apiRequest(membersUrl, "GET");
                 if (!isMounted) return;
@@ -132,7 +133,7 @@ export default function Tasks() {
         return () => {
             isMounted = false;
         };
-    }, [selectedProject, user]);
+    }, [selectedProject, loggedInMemberId]);
 
     useEffect(() => {
         let isMounted = true;
@@ -202,16 +203,16 @@ export default function Tasks() {
 
                 let projectIds = [];
                 if (appliedFilters.project !== "all") {
-                    projectIds = [Number(appliedFilters.project)];
+                    projectIds = [String(appliedFilters.project)];
                 } else {
                     const projectUrl = loggedInMemberId
-                        ? API_ENDPOINTS.PROJECT_BY_MEMBER(loggedInMemberId)
-                        : API_ENDPOINTS.PROJECTS;
+                        ? API_ENDPOINTS.TASKS_PROJECTS(loggedInMemberId)
+                        : API_ENDPOINTS.TASKS_PROJECTS();
                     const pjRes = await apiRequest(projectUrl, "GET");
                     const projectRows = pjRes.projects || pjRes || [];
                     projectIds = projectRows
-                        .map((project) => Number(project.id))
-                        .filter((id) => id > 0);
+                        .map((project) => String(project.id || "").trim())
+                        .filter(Boolean);
                 }
 
                 if (!projectIds.length) {
@@ -226,11 +227,11 @@ export default function Tasks() {
                         try {
                             const [taskRes, memberRes] = await Promise.all([
                                 apiRequest(
-                                    API_ENDPOINTS.PROJECT_TASKS(projectId),
+                                    API_ENDPOINTS.TASKS_PROJECT_ITEMS(projectId),
                                     "GET",
                                 ),
                                 apiRequest(
-                                    API_ENDPOINTS.PROJECT_MEMBERS(projectId),
+                                    API_ENDPOINTS.TASKS_PROJECT_MEMBERS(projectId),
                                     "GET",
                                 ),
                             ]);
@@ -261,7 +262,9 @@ export default function Tasks() {
                 const mergedTasks = taskResponses.flatMap((entry) =>
                     (entry.tasks || []).map((task) => ({
                         ...task,
-                        project_id: Number(task.project_id) || entry.projectId,
+                        project_id:
+                            String(task.project_id || "").trim() ||
+                            String(entry.projectId || ""),
                     })),
                 );
                 setTasks(mergedTasks);
@@ -515,13 +518,13 @@ export default function Tasks() {
                         <label className="text-[11px] uppercase auth-accent">
                             Priority
                         </label>
-                        <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <div className="mt-1 flex items-center gap-2">
                             <select
                                 value={selectedPriority}
                                 onChange={(e) =>
                                     setSelectedPriority(e.target.value)
                                 }
-                                className="block w-full rounded-md border auth-border bg-transparent px-3 py-2 text-sm auth-text-primary"
+                                className="block min-w-0 flex-1 rounded-md border auth-border bg-transparent px-3 py-2 text-sm auth-text-primary"
                             >
                                 {priorityOptions.map((p) => (
                                     <option key={p.value} value={p.value}>
@@ -530,7 +533,7 @@ export default function Tasks() {
                                 ))}
                             </select>
 
-                            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+                            <div className="flex flex-none items-center gap-2 whitespace-nowrap">
                                 <button
                                     className="rounded-full border auth-border px-3 py-2 text-xs font-semibold auth-text-primary sm:px-4"
                                     onClick={handleApply}

@@ -76,7 +76,19 @@ export const API_ENDPOINTS = {
         `${BASE_URL}/projects/${projectId}/finances/${financeId}`,
 
     PROJECT_MEMBER_ROLES: `${BASE_URL}/project-member-roles`,
+    DASHBOARD_OVERVIEW: `${BASE_URL}/dashboard`,
 
     PROJECT_BY_MEMBER: (memberId) => `${BASE_URL}/projects?member=${memberId}`,
     TASKS_DASHBOARD: `${BASE_URL}/projects/tasks/dashboard`,
+    TASKS_PROJECTS: (memberId) =>
+        memberId ? `${BASE_URL}/projects?member=${memberId}` : `${BASE_URL}/projects`,
+    TASKS_MEMBERS: (memberId) =>
+        memberId
+            ? `${BASE_URL}/members?project_member=${memberId}`
+            : `${BASE_URL}/members`,
+    TASKS_PROJECT_MEMBERS: (projectId, excludeMemberId) =>
+        `${BASE_URL}/projects/${projectId}/members${
+            excludeMemberId ? `?exclude_member_id=${excludeMemberId}` : ""
+        }`,
+    TASKS_PROJECT_ITEMS: (projectId) => `${BASE_URL}/projects/${projectId}/tasks`,
 };

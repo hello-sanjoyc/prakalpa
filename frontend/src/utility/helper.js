@@ -1,4 +1,5 @@
 import { DateTime } from "luxon";
+import MD5 from "crypto-js/md5";
 
 export function getCurrentFinancialYear() {
     const date = new Date();
@@ -9,6 +10,10 @@ export function getCurrentFinancialYear() {
     const endYearShort = String(startYear + 1).slice(-2);
 
     return `${startYear}-${endYearShort}`;
+}
+
+export function md5Hash(value) {
+    return MD5(String(value || "")).toString();
 }
 
 export function formatDateTime(date, format = "dd-LLL-yyyy") {

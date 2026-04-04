@@ -10,7 +10,7 @@ export const memberOptionsSchema = {
     querystring: {
         type: "object",
         properties: {
-            department_id: { type: "integer" },
+            department_id: { type: ["integer", "string"] },
         },
     },
     response: {
@@ -22,7 +22,7 @@ export const memberOptionsSchema = {
                     items: {
                         type: "object",
                         properties: {
-                            id: { type: "integer" },
+                            id: { type: "string" },
                             full_name: { type: "string" },
                             email: { type: "string" },
                             designation: { type: "string" },
@@ -44,7 +44,7 @@ export const roleOptionsSchema = {
                     items: {
                         type: "object",
                         properties: {
-                            id: { type: "integer" },
+                            id: { type: "string" },
                             name: { type: "string" },
                             slug: { type: "string" },
                         },

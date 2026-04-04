@@ -1,4 +1,5 @@
 import { Sequelize, Op, fn, col } from "sequelize";
+import crypto from "crypto";
 import initModels from "../../models/index.js";
 import { env } from "../../config/index.js";
 
@@ -18,6 +19,85 @@ export default class DepartmentService {
         this.Member = models.Member;
         this.ProjectStage = models.ProjectStage;
         this.Project = models.Project;
+    }
+
+    md5(value) {
+        return crypto.createHash("md5").update(String(value)).digest("hex");
+    }
+
+    isMd5Hash(value) {
+        return /^[a-f0-9]{32}$/i.test(String(value || ""));
+    }
+
+    toComparableMd5(value) {
+        const normalized = String(value || "").trim();
+        if (!normalized) {
+            const err = new Error("Invalid id");
+            err.statusCode = 400;
+            throw err;
+        }
+        return this.isMd5Hash(normalized)
+            ? normalized.toLowerCase()
+            : this.md5(normalized);
+    }
+
+    isIdField(key) {
+        return key === "id" || key.endsWith("_id");
+    }
+
+    hashIdFields(data) {
+        if (Array.isArray(data)) return data.map((item) => this.hashIdFields(item));
+        if (!data || typeof data !== "object") return data;
+        if (data instanceof Date) return data;
+
+        const source = typeof data.toJSON === "function" ? data.toJSON() : data;
+        const out = {};
+        for (const [key, value] of Object.entries(source)) {
+            if (value === null || value === undefined) {
+                out[key] = value;
+                continue;
+            }
+            if (
+                this.isIdField(key) &&
+                ["string", "number", "bigint"].includes(typeof value)
+            ) {
+                out[key] = this.md5(value);
+                continue;
+            }
+            out[key] = this.hashIdFields(value);
+        }
+        return out;
+    }
+
+    async resolveRawDepartmentId(idOrHash) {
+        if (idOrHash === null || idOrHash === undefined || idOrHash === "") {
+            return null;
+        }
+        if (typeof idOrHash === "number") return idOrHash;
+
+        const normalized = String(idOrHash).trim();
+        if (/^\d+$/.test(normalized)) return Number(normalized);
+
+        const hashValue = this.toComparableMd5(normalized);
+        const department = await this.Department.findOne({
+            attributes: ["id"],
+            where: Sequelize.where(fn("MD5", col("id")), hashValue),
+        });
+        if (!department) {
+            const err = new Error("Invalid parent_id");
+            err.statusCode = 400;
+            throw err;
+        }
+        return department.id;
+    }
+
+    async normalizeDepartmentPayload(payload) {
+        if (!payload || !Object.prototype.hasOwnProperty.call(payload, "parent_id")) {
+            return payload;
+        }
+        const normalized = { ...payload };
+        normalized.parent_id = await this.resolveRawDepartmentId(payload.parent_id);
+        return normalized;
     }
 
     async list({
@@ -54,38 +134,73 @@ export default class DepartmentService {
             order,
         });
         return {
-            rows,
+            rows: this.hashIdFields(rows),
             total: Number(count) || 0,
             page: safePage,
             limit: safeLimit,
         };
     }
 
-    async getById(id) {
+    async getById(idHash) {
+        const comparableHash = this.toComparableMd5(idHash);
         const dept = await this.Department.findOne({
-            where: { id, deleted_at: null },
+            where: {
+                [Op.and]: [
+                    { deleted_at: null },
+                    Sequelize.where(fn("MD5", col("id")), comparableHash),
+                ],
+            },
         });
         if (!dept) {
             const err = new Error("Department not found");
             err.statusCode = 404;
             throw err;
         }
-        return dept;
+        return this.hashIdFields(dept);
     }
 
     async create(payload) {
-        return this.Department.create(payload);
+        const normalizedPayload = await this.normalizeDepartmentPayload(payload);
+        const department = await this.Department.create(normalizedPayload);
+        return this.hashIdFields(department);
     }
 
-    async update(id, payload) {
-        const dept = await this.getById(id);
-        dept.set(payload);
+    async update(idHash, payload) {
+        const comparableHash = this.toComparableMd5(idHash);
+        const dept = await this.Department.findOne({
+            where: {
+                [Op.and]: [
+                    { deleted_at: null },
+                    Sequelize.where(fn("MD5", col("id")), comparableHash),
+                ],
+            },
+        });
+        if (!dept) {
+            const err = new Error("Department not found");
+            err.statusCode = 404;
+            throw err;
+        }
+        const normalizedPayload = await this.normalizeDepartmentPayload(payload);
+        dept.set(normalizedPayload);
         await dept.save();
-        return dept;
+        return this.hashIdFields(dept);
     }
 
-    async softDelete(id) {
-        const dept = await this.getById(id);
+    async softDelete(idHash) {
+        const comparableHash = this.toComparableMd5(idHash);
+        const dept = await this.Department.findOne({
+            where: {
+                [Op.and]: [
+                    { deleted_at: null },
+                    Sequelize.where(fn("MD5", col("id")), comparableHash),
+                ],
+            },
+        });
+        if (!dept) {
+            const err = new Error("Department not found");
+            err.statusCode = 404;
+            throw err;
+        }
         dept.deleted_at = new Date();
         await dept.save();
         return { success: true };
@@ -97,7 +212,7 @@ export default class DepartmentService {
             attributes: ["id", "name"],
             order: [["name", "ASC"]],
         });
-        return departments;
+        return this.hashIdFields(departments);
     }
 
     normalizeAvatarPath(member) {
@@ -111,19 +226,23 @@ export default class DepartmentService {
         return member;
     }
 
-    async members(departmentId) {
+    async members(departmentIdHash) {
+        const comparableHash = this.toComparableMd5(departmentIdHash);
         const members = await this.Member.findAll({
             where: {
-                department_id: departmentId,
-                [Op.or]: [
-                    { designation: { [Op.is]: null } },
-                    { designation: { [Op.eq]: "" } },
+                [Op.and]: [
+                    Sequelize.where(fn("MD5", col("department_id")), comparableHash),
                     {
-                        [Op.and]: [
-                            Sequelize.where(
-                                fn("LOWER", col("designation")),
-                                { [Op.ne]: "vendor" }
-                            ),
+                        [Op.or]: [
+                            { designation: { [Op.is]: null } },
+                            { designation: { [Op.eq]: "" } },
+                            {
+                                [Op.and]: [
+                                    Sequelize.where(fn("LOWER", col("designation")), {
+                                        [Op.ne]: "vendor",
+                                    }),
+                                ],
+                            },
                         ],
                     },
                 ],
@@ -138,27 +257,31 @@ export default class DepartmentService {
             ],
             order: [["full_name", "ASC"]],
         });
-        return members.map((member) => this.normalizeAvatarPath(member));
+        return this.hashIdFields(
+            members.map((member) => this.normalizeAvatarPath(member))
+        );
     }
 
-    async stages(departmentId) {
+    async stages(departmentIdHash) {
+        await this.getById(departmentIdHash);
         const stages = await this.ProjectStage.findAll({
             order: [["stage_order", "ASC"]],
         });
-        return stages.map((stage) => stage.toJSON());
+        return this.hashIdFields(stages.map((stage) => stage.toJSON()));
     }
 
-    async vendors(departmentId) {
+    async vendors(departmentIdHash) {
+        const comparableHash = this.toComparableMd5(departmentIdHash);
         const vendors = await this.Member.findAll({
             where: {
-                department_id: departmentId,
                 [Op.and]: [
+                    Sequelize.where(fn("MD5", col("department_id")), comparableHash),
                     Sequelize.where(fn("LOWER", col("designation")), "vendor"),
                 ],
             },
             attributes: ["id", "full_name", "email", "designation"],
             order: [["full_name", "ASC"]],
         });
-        return vendors;
+        return this.hashIdFields(vendors);
     }
 }

@@ -7,15 +7,15 @@ const memberBody = {
         secondary_phone: { type: "string", minLength: 0, maxLength: 15 },
         whatsapp: { type: "string", minLength: 0, maxLength: 15 },
         designation: { type: "string", maxLength: 255 },
-        department_id: { type: "integer" },
+        department_id: { type: ["integer", "string"] },
         username: { type: "string", maxLength: 150 },
-        role_id: { type: "integer" },
+        role_id: { type: ["integer", "string"] },
     },
 };
 
 const idParam = {
     type: "object",
-    properties: { id: { type: "integer" } },
+    properties: { id: { type: "string", pattern: "^[a-fA-F0-9]{32}$" } },
     required: ["id"],
 };
 
@@ -39,7 +39,7 @@ export const listMemberSchema = {
             },
             sortOrder: { type: "string", enum: ["asc", "desc"] },
             search: { type: "string", minLength: 1, maxLength: 100 },
-            project_member: { type: "integer" },
+            project_member: { type: ["integer", "string"] },
         },
     },
     response: {

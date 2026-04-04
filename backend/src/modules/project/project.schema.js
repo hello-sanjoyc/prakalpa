@@ -3,7 +3,7 @@ export const listProjectsSchema = {
         type: "object",
         properties: {
             includeDeleted: { type: "boolean", default: false },
-            member: { type: "integer" },
+            member: { type: ["integer", "string"] },
             page: { type: "integer", minimum: 1 },
             limit: { type: "integer", minimum: 1, maximum: 200 },
             sortBy: {
@@ -48,7 +48,7 @@ export const projectIdParamSchema = {
     params: {
         type: "object",
         properties: {
-            id: { type: "integer" },
+            id: { type: "string", pattern: "^[a-fA-F0-9]{32}$" },
         },
         required: ["id"],
     },
@@ -58,8 +58,8 @@ export const projectMilestoneIdParamSchema = {
     params: {
         type: "object",
         properties: {
-            id: { type: "integer" },
-            milestoneId: { type: "integer" },
+            id: { type: "string", pattern: "^[a-fA-F0-9]{32}$" },
+            milestoneId: { type: "string", pattern: "^[a-fA-F0-9]{32}$" },
         },
         required: ["id", "milestoneId"],
     },
@@ -69,8 +69,8 @@ export const projectTaskIdParamSchema = {
     params: {
         type: "object",
         properties: {
-            id: { type: "integer" },
-            taskId: { type: "integer" },
+            id: { type: "string", pattern: "^[a-fA-F0-9]{32}$" },
+            taskId: { type: "string", pattern: "^[a-fA-F0-9]{32}$" },
         },
         required: ["id", "taskId"],
     },
@@ -80,8 +80,8 @@ export const projectFinanceIdParamSchema = {
     params: {
         type: "object",
         properties: {
-            id: { type: "integer" },
-            financeId: { type: "integer" },
+            id: { type: "string", pattern: "^[a-fA-F0-9]{32}$" },
+            financeId: { type: "string", pattern: "^[a-fA-F0-9]{32}$" },
         },
         required: ["id", "financeId"],
     },
@@ -91,8 +91,8 @@ export const projectFileIdParamSchema = {
     params: {
         type: "object",
         properties: {
-            id: { type: "integer" },
-            fileId: { type: "integer" },
+            id: { type: "string", pattern: "^[a-fA-F0-9]{32}$" },
+            fileId: { type: "string", pattern: "^[a-fA-F0-9]{32}$" },
         },
         required: ["id", "fileId"],
     },
@@ -121,13 +121,13 @@ const projectBodyProperties = {
     code: { type: "string", maxLength: 20 },
     title: { type: "string", maxLength: 100 },
     description: { type: "string", maxLength: 512 },
-    department_id: { type: "integer" },
-    owner_id: { type: "integer" },
+    department_id: { type: ["integer", "string"] },
+    owner_id: { type: ["integer", "string"] },
     fin_year: { type: "string", maxLength: 9 },
     budget: { type: "number" },
     fund_allocated: { type: "number" },
     fund_consumed: { type: "number" },
-    current_stage_id: { type: "number" },
+    current_stage_id: { type: ["number", "string"] },
     rag_status: { type: "string", enum: ["RED", "AMBER", "GREEN"] },
     rag_manual_override: { type: "boolean" },
     rag_override_reason: { type: "string" },
@@ -150,7 +150,7 @@ export const createProjectSchema = {
                 items: {
                     type: "object",
                     properties: {
-                        member_id: { type: "integer" },
+                        member_id: { type: ["integer", "string"] },
                         role: { type: "string", maxLength: 64 },
                     },
                     required: ["member_id", "role"],
@@ -172,7 +172,7 @@ export const updateProjectSchema = {
                 items: {
                     type: "object",
                     properties: {
-                        member_id: { type: "integer" },
+                        member_id: { type: ["integer", "string"] },
                         role: { type: "string", maxLength: 64 },
                     },
                     required: ["member_id", "role"],
@@ -180,7 +180,7 @@ export const updateProjectSchema = {
             },
             vendor_ids: {
                 type: "array",
-                items: { type: "integer" },
+                items: { type: ["integer", "string"] },
             },
         },
         additionalProperties: false,
@@ -216,8 +216,8 @@ export const listTaskDashboardSchema = {
     querystring: {
         type: "object",
         properties: {
-            project_id: { type: "integer", minimum: 1 },
-            member_id: { type: "integer", minimum: 1 },
+            project_id: { type: ["integer", "string"] },
+            member_id: { type: ["integer", "string"] },
             member_scope: { type: "string", enum: ["all", "me"] },
             status: {
                 type: "string",
@@ -268,7 +268,7 @@ export const listProjectFilesSchema = {
         ...listQuerySchema,
         properties: {
             ...listQuerySchema.properties,
-            parent_id: { type: ["integer", "null"] },
+            parent_id: { type: ["integer", "string", "null"] },
         },
     },
 };
@@ -278,7 +278,7 @@ export const listProjectMembersSchema = {
     querystring: {
         type: "object",
         properties: {
-            exclude_member_id: { type: "integer" },
+            exclude_member_id: { type: ["integer", "string"] },
         },
     },
     response: {
@@ -355,10 +355,10 @@ export const createProjectTaskSchema = {
     body: {
         type: "object",
         properties: {
-            milestone_id: { type: "integer" },
+            milestone_id: { type: ["integer", "string"] },
             title: { type: "string", maxLength: 512 },
             description: { type: "string" },
-            owner_id: { type: ["integer", "null"] },
+            owner_id: { type: ["integer", "string", "null"] },
             sla_hours: { type: ["integer", "null"] },
             due_date: { type: ["string", "null"], format: "date" },
             priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
@@ -377,10 +377,10 @@ export const updateProjectTaskSchema = {
     body: {
         type: "object",
         properties: {
-            milestone_id: { type: "integer" },
+            milestone_id: { type: ["integer", "string"] },
             title: { type: "string", maxLength: 512 },
             description: { type: "string" },
-            owner_id: { type: ["integer", "null"] },
+            owner_id: { type: ["integer", "string", "null"] },
             sla_hours: { type: ["integer", "null"] },
             due_date: dateField,
             priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
@@ -402,9 +402,9 @@ export const createProjectActionSchema = {
     body: {
         type: "object",
         properties: {
-            task_id: { type: "integer" },
+            task_id: { type: ["integer", "string"] },
             title: { type: "string", maxLength: 512 },
-            owner_id: { type: ["integer", "null"] },
+            owner_id: { type: ["integer", "string", "null"] },
             due_date: { type: ["string", "null"], format: "date" },
             status: { type: "string", enum: ["OPEN", "DONE"] },
         },
@@ -452,14 +452,14 @@ export const createProjectFolderSchema = {
         type: "object",
         properties: {
             name: { type: "string", maxLength: 512 },
-            parent_id: { type: ["integer", "null"] },
+            parent_id: { type: ["integer", "string", "null"] },
             share_scope: {
                 type: "string",
                 enum: ["only_me", "all_members", "selected"],
             },
             shared_with: {
                 type: "array",
-                items: { type: "integer" },
+                items: { type: ["integer", "string"] },
             },
         },
         required: ["name"],

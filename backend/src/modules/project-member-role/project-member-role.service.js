@@ -1,6 +1,10 @@
 import { Op, Sequelize, fn, col } from "sequelize";
 import initModels from "../../models/index.js";
 import { env } from "../../config/index.js";
+import {
+    hashIdFields,
+    resolveIdFromModel,
+} from "../../lib/id-hash.js";
 
 export default class ProjectMemberRoleService {
     constructor(db) {
@@ -15,30 +19,29 @@ export default class ProjectMemberRoleService {
 
         const models = initModels(this.sequelize);
         this.ProjectMemberRole = models.ProjectMemberRole;
+        this.Project = models.Project;
     }
 
     async list(projectId) {
-        const projectValue = Number(projectId);
-        if (!projectId || Number.isNaN(projectValue) || projectValue <= 0) {
-            const err = new Error("Project id is required");
-            err.statusCode = 400;
-            throw err;
-        }
+        const projectValue = await resolveIdFromModel(
+            this.Project,
+            projectId,
+            "project_id",
+        );
         const roles = await this.ProjectMemberRole.findAll({
             where: { project_id: projectValue },
             order: [["name", "ASC"]],
         });
-        return roles;
+        return hashIdFields(roles);
     }
 
     async create(payload = {}) {
         const name = String(payload.name || "").trim();
-        const projectId = Number(payload.project_id);
-        if (!projectId || Number.isNaN(projectId)) {
-            const err = new Error("Project id is required");
-            err.statusCode = 400;
-            throw err;
-        }
+        const projectId = await resolveIdFromModel(
+            this.Project,
+            payload?.project_id,
+            "project_id",
+        );
         if (!name) {
             const err = new Error("Role name is required");
             err.statusCode = 400;
@@ -60,6 +63,10 @@ export default class ProjectMemberRoleService {
             err.statusCode = 409;
             throw err;
         }
-        return this.ProjectMemberRole.create({ name, project_id: projectId });
+        const role = await this.ProjectMemberRole.create({
+            name,
+            project_id: projectId,
+        });
+        return hashIdFields(role);
     }
 }

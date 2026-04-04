@@ -2,6 +2,11 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { QueryTypes, Sequelize } from "sequelize";
 import { env } from "../../config/index.js";
+import initModels from "../../models/index.js";
+import {
+    hashIdFields,
+    resolveOptionalIdFromModel,
+} from "../../lib/id-hash.js";
 
 export default class AuthService {
     constructor(sequelize) {
@@ -15,6 +20,11 @@ export default class AuthService {
                 dialect: env.DB_DIALECT,
                 logging: false,
             });
+
+        const models = initModels(this.sequelize);
+        this.Member = models.Member;
+        this.Role = models.Role;
+        this.Department = models.Department;
     }
 
     async login(credentials = {}) {
@@ -106,11 +116,15 @@ export default class AuthService {
     }
 
     async memberOptions(filters = {}) {
-        const { department_id } = filters;
+        const departmentId = await resolveOptionalIdFromModel(
+            this.Department,
+            filters?.department_id,
+            "department_id",
+        );
 
         const whereConditions = ["LOWER(designation) <> 'vendor'"];
 
-        if (department_id) {
+        if (departmentId) {
             whereConditions.push("department_id = :department_id");
         }
 
@@ -126,11 +140,13 @@ export default class AuthService {
             `,
                 {
                     type: QueryTypes.SELECT,
-                    replacements: department_id ? { department_id } : {},
+                    replacements: departmentId
+                        ? { department_id: departmentId }
+                        : {},
                 }
             )) || [];
 
-        return members;
+        return hashIdFields(members);
     }
 
     async roleOptions() {
@@ -143,6 +159,6 @@ export default class AuthService {
             `,
                 { type: QueryTypes.SELECT }
             )) || [];
-        return roles;
+        return hashIdFields(roles);
     }
 }
