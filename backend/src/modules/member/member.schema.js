@@ -39,6 +39,7 @@ export const listMemberSchema = {
             },
             sortOrder: { type: "string", enum: ["asc", "desc"] },
             search: { type: "string", minLength: 1, maxLength: 100 },
+            project_member: { type: "integer" },
         },
     },
     response: {

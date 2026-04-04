@@ -108,6 +108,7 @@ export default class ProjectService {
         sortBy = "title",
         sortOrder = "asc",
         search = "",
+        member = null,
         includeDeleted = false,
     } = {}) {
         try {
@@ -131,6 +132,11 @@ export default class ProjectService {
             if (!includeDeleted) {
                 whereClauseParts.push("p.deleted_at IS NULL");
             }
+            if (member) {
+                whereClauseParts.push(
+                    `(pm.member_id = :memberId OR u.member_id = :memberId)`,
+                );
+            }
             if (trimmedSearch) {
                 whereClauseParts.push(
                     `(p.title LIKE :search OR p.code LIKE :search OR d.name LIKE :search OR m.full_name LIKE :search OR s.stage_slug LIKE :search)`,
@@ -140,9 +146,11 @@ export default class ProjectService {
                 ? `WHERE ${whereClauseParts.join(" AND ")}`
                 : "";
 
-            const rows =
-                (await this.sequelize.query(
-                    `
+            const joinClause = member
+                ? "LEFT JOIN project_members pm ON pm.project_id = p.id"
+                : "";
+
+            const rowsSql = `
             SELECT
                 p.*,
                 d.name AS department_name,
@@ -155,38 +163,46 @@ export default class ProjectService {
             FROM projects p
             LEFT JOIN departments d ON d.id = p.department_id
             LEFT JOIN users u ON u.id = p.owner_id
+            ${joinClause}
             LEFT JOIN members m ON m.id = u.member_id
             LEFT JOIN project_stages s ON s.id = p.current_stage_id
             ${whereClause}
             ORDER BY ${orderBy} ${orderDir}, p.created_at DESC
             LIMIT :limit OFFSET :offset
-            `,
-                    {
-                        type: QueryTypes.SELECT,
-                        replacements: {
-                            limit: safeLimit,
-                            offset,
-                            ...(likeSearch ? { search: likeSearch } : {}),
-                        },
-                    },
-                )) || [];
+            `;
 
-            const [{ total = 0 } = {}] =
-                (await this.sequelize.query(
-                    `
+            //console.log("[SQL][projects rows]:", rowsSql);
+
+            const rows =
+                (await this.sequelize.query(rowsSql, {
+                    type: QueryTypes.SELECT,
+                    replacements: {
+                        limit: safeLimit,
+                        offset,
+                        ...(likeSearch ? { search: likeSearch } : {}),
+                        ...(member ? { memberId: Number(member) } : {}),
+                    },
+                })) || [];
+
+            const countSql = `
             SELECT COUNT(DISTINCT p.id) AS total
             FROM projects p
             LEFT JOIN departments d ON d.id = p.department_id
             LEFT JOIN users u ON u.id = p.owner_id
+            ${joinClause}
             LEFT JOIN members m ON m.id = u.member_id
             LEFT JOIN project_stages s ON s.id = p.current_stage_id
             ${whereClause}
-            `,
-                    {
-                        type: QueryTypes.SELECT,
-                        replacements: likeSearch ? { search: likeSearch } : {},
+            `;
+
+            const [{ total = 0 } = {}] =
+                (await this.sequelize.query(countSql, {
+                    type: QueryTypes.SELECT,
+                    replacements: {
+                        ...(likeSearch ? { search: likeSearch } : {}),
+                        ...(member ? { memberId: Number(member) } : {}),
                     },
-                )) || [];
+                })) || [];
 
             return {
                 rows,
@@ -519,6 +535,54 @@ export default class ProjectService {
         }
     }
 
+    async listMembers({ projectId, excludeMemberId = null } = {}) {
+        try {
+            if (!projectId) return [];
+            const rowsSql = `
+            SELECT
+                m.id,
+                m.full_name,
+                m.email,
+                m.designation,
+                m.avatar_path,
+                pm.role AS project_role
+            FROM project_members pm
+            JOIN members m ON m.id = pm.member_id
+            JOIN projects p ON p.id = pm.project_id
+            WHERE pm.project_id = :projectId
+              AND p.deleted_at IS NULL
+              ${excludeMemberId ? "AND m.id <> :excludeMemberId" : ""}
+            ORDER BY m.full_name ASC
+            `;
+
+            const rows =
+                (await this.sequelize.query(rowsSql, {
+                    type: QueryTypes.SELECT,
+                    replacements: {
+                        projectId: Number(projectId),
+                        ...(excludeMemberId
+                            ? { excludeMemberId: Number(excludeMemberId) }
+                            : {}),
+                    },
+                })) || [];
+
+            const normalized = rows.map((r) => {
+                if (env.BASE_URL && r.avatar_path) {
+                    const base = String(env.BASE_URL).replace(/\/$/, "");
+                    const suffix = r.avatar_path.startsWith("/")
+                        ? r.avatar_path
+                        : `/${r.avatar_path}`;
+                    r.avatar_path = `${base}${suffix}`;
+                }
+                return r;
+            });
+            return normalized;
+        } catch (err) {
+            this.logError("listMembers", err);
+            throw err;
+        }
+    }
+
     async softDeleteProjectFile(projectId, fileId, deletedBy = null) {
         try {
             const file = await this.ProjectFile.findOne({
@@ -643,7 +707,7 @@ export default class ProjectService {
                         milestone_id: milestone.id,
                         deleted_at: null,
                     },
-                }
+                },
             );
             return { success: true };
         } catch (err) {
@@ -1115,7 +1179,10 @@ export default class ProjectService {
                 (await this.ProjectFinance.findAll({
                     attributes: [
                         [
-                            Sequelize.fn("SUM", Sequelize.col("fund_allocated")),
+                            Sequelize.fn(
+                                "SUM",
+                                Sequelize.col("fund_allocated"),
+                            ),
                             "total_allocated",
                         ],
                         [
@@ -1132,8 +1199,7 @@ export default class ProjectService {
 
             const totalAllocated =
                 Number(totals.total_allocated || 0) + allocated;
-            const totalConsumed =
-                Number(totals.total_consumed || 0) + consumed;
+            const totalConsumed = Number(totals.total_consumed || 0) + consumed;
 
             if (totalConsumed > totalAllocated) {
                 const err = new Error(
@@ -1201,7 +1267,9 @@ export default class ProjectService {
                 }
                 updates.entry_date = entryDate;
             }
-            if (Object.prototype.hasOwnProperty.call(payload, "fund_allocated")) {
+            if (
+                Object.prototype.hasOwnProperty.call(payload, "fund_allocated")
+            ) {
                 const allocated = Number(payload.fund_allocated);
                 if (!Number.isFinite(allocated)) {
                     const err = new Error("Fund Allocated must be a number");
@@ -1215,7 +1283,9 @@ export default class ProjectService {
                 }
                 updates.fund_allocated = allocated;
             }
-            if (Object.prototype.hasOwnProperty.call(payload, "fund_consumed")) {
+            if (
+                Object.prototype.hasOwnProperty.call(payload, "fund_consumed")
+            ) {
                 const consumed = Number(payload.fund_consumed);
                 if (!Number.isFinite(consumed)) {
                     const err = new Error("Fund Expenses must be a number");
@@ -1253,7 +1323,10 @@ export default class ProjectService {
                 (await this.ProjectFinance.findAll({
                     attributes: [
                         [
-                            Sequelize.fn("SUM", Sequelize.col("fund_allocated")),
+                            Sequelize.fn(
+                                "SUM",
+                                Sequelize.col("fund_allocated"),
+                            ),
                             "total_allocated",
                         ],
                         [
@@ -1273,19 +1346,11 @@ export default class ProjectService {
             const nextAllocated =
                 currentAllocated -
                 Number(finance.fund_allocated || 0) +
-                Number(
-                    updates.fund_allocated ??
-                        finance.fund_allocated ??
-                        0,
-                );
+                Number(updates.fund_allocated ?? finance.fund_allocated ?? 0);
             const nextConsumed =
                 currentConsumed -
                 Number(finance.fund_consumed || 0) +
-                Number(
-                    updates.fund_consumed ??
-                        finance.fund_consumed ??
-                        0,
-                );
+                Number(updates.fund_consumed ?? finance.fund_consumed ?? 0);
 
             if (nextConsumed > nextAllocated) {
                 const err = new Error(
@@ -1346,7 +1411,10 @@ export default class ProjectService {
                 (await this.ProjectFinance.findAll({
                     attributes: [
                         [
-                            Sequelize.fn("SUM", Sequelize.col("fund_allocated")),
+                            Sequelize.fn(
+                                "SUM",
+                                Sequelize.col("fund_allocated"),
+                            ),
                             "total_allocated",
                         ],
                         [

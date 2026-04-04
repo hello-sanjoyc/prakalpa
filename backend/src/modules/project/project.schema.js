@@ -3,11 +3,19 @@ export const listProjectsSchema = {
         type: "object",
         properties: {
             includeDeleted: { type: "boolean", default: false },
+            member: { type: "integer" },
             page: { type: "integer", minimum: 1 },
             limit: { type: "integer", minimum: 1, maximum: 200 },
             sortBy: {
                 type: "string",
-                enum: ["title", "code", "department", "owner", "stage", "budget"],
+                enum: [
+                    "title",
+                    "code",
+                    "department",
+                    "owner",
+                    "stage",
+                    "budget",
+                ],
             },
             sortOrder: { type: "string", enum: ["asc", "desc"] },
             search: { type: "string", minLength: 1, maxLength: 100 },
@@ -210,7 +218,10 @@ export const listProjectActionsSchema = {
         ...listQuerySchema,
         properties: {
             ...listQuerySchema.properties,
-            sortBy: { type: "string", enum: ["title", "status", "due_date", "task"] },
+            sortBy: {
+                type: "string",
+                enum: ["title", "status", "due_date", "task"],
+            },
         },
     },
 };
@@ -222,6 +233,27 @@ export const listProjectFilesSchema = {
         properties: {
             ...listQuerySchema.properties,
             parent_id: { type: ["integer", "null"] },
+        },
+    },
+};
+
+export const listProjectMembersSchema = {
+    ...projectIdParamSchema,
+    querystring: {
+        type: "object",
+        properties: {
+            exclude_member_id: { type: "integer" },
+        },
+    },
+    response: {
+        200: {
+            type: "object",
+            properties: {
+                members: {
+                    type: "array",
+                    items: { type: "object", additionalProperties: true },
+                },
+            },
         },
     },
 };
@@ -252,7 +284,10 @@ export const createProjectMilestoneSchema = {
         properties: {
             title: { type: "string", maxLength: 512 },
             due_date: { type: ["string", "null"], format: "date" },
-            status: { type: "string", enum: ["PENDING", "IN_PROGRESS", "COMPLETE"] },
+            status: {
+                type: "string",
+                enum: ["PENDING", "IN_PROGRESS", "COMPLETE"],
+            },
         },
         required: ["title"],
         additionalProperties: false,
@@ -266,7 +301,10 @@ export const updateProjectMilestoneSchema = {
         properties: {
             title: { type: "string", maxLength: 512 },
             due_date: dateField,
-            status: { type: "string", enum: ["PENDING", "IN_PROGRESS", "COMPLETE"] },
+            status: {
+                type: "string",
+                enum: ["PENDING", "IN_PROGRESS", "COMPLETE"],
+            },
         },
         additionalProperties: false,
     },
@@ -288,7 +326,10 @@ export const createProjectTaskSchema = {
             sla_hours: { type: ["integer", "null"] },
             due_date: { type: ["string", "null"], format: "date" },
             priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
-            status: { type: "string", enum: ["OPEN", "IN_PROGRESS", "BLOCKED", "DONE"] },
+            status: {
+                type: "string",
+                enum: ["OPEN", "IN_PROGRESS", "BLOCKED", "DONE"],
+            },
         },
         required: ["milestone_id", "title"],
         additionalProperties: false,
@@ -307,7 +348,10 @@ export const updateProjectTaskSchema = {
             sla_hours: { type: ["integer", "null"] },
             due_date: dateField,
             priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
-            status: { type: "string", enum: ["OPEN", "IN_PROGRESS", "BLOCKED", "DONE"] },
+            status: {
+                type: "string",
+                enum: ["OPEN", "IN_PROGRESS", "BLOCKED", "DONE"],
+            },
         },
         additionalProperties: false,
     },

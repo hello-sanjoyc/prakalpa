@@ -17,6 +17,7 @@ import {
     listProjectFinances,
     listProjectActions,
     listProjectMilestones,
+    listProjectMembers,
     listProjectTasks,
     listProjects,
     uploadProjectFile,
@@ -39,6 +40,7 @@ import {
     downloadProjectFileSchema,
     listProjectFilesSchema,
     listProjectFinancesSchema,
+    listProjectMembersSchema,
     listProjectsSchema,
     listProjectActionsSchema,
     listProjectMilestonesSchema,
@@ -57,13 +59,13 @@ export default async function projectRoutes(fastify) {
     fastify.get(
         "/",
         { schema: listProjectsSchema, preHandler: [auth] },
-        listProjects
+        listProjects,
     );
 
     fastify.get(
         "/:id",
         { schema: projectIdParamSchema, preHandler: [auth] },
-        getProject
+        getProject,
     );
 
     fastify.post(
@@ -72,118 +74,132 @@ export default async function projectRoutes(fastify) {
             schema: createProjectSchema,
             preHandler: [auth, allowAdmin],
         },
-        createProject
+        createProject,
     );
 
     fastify.put(
         "/:id",
         { schema: updateProjectSchema, preHandler: [auth, allowAdmin] },
-        updateProject
+        updateProject,
     );
 
     fastify.delete(
         "/:id",
         { schema: projectIdParamSchema, preHandler: [auth, allowAdmin] },
-        deleteProject
+        deleteProject,
     );
 
     fastify.get(
         "/:id/milestones",
         { schema: listProjectMilestonesSchema, preHandler: [auth] },
-        listProjectMilestones
+        listProjectMilestones,
+    );
+    fastify.get(
+        "/:id/members",
+        { schema: listProjectMembersSchema, preHandler: [auth] },
+        listProjectMembers,
     );
     fastify.post(
         "/:id/milestones",
-        { schema: createProjectMilestoneSchema, preHandler: [auth, allowAdmin] },
-        createProjectMilestone
+        {
+            schema: createProjectMilestoneSchema,
+            preHandler: [auth, allowAdmin],
+        },
+        createProjectMilestone,
     );
     fastify.put(
         "/:id/milestones/:milestoneId",
-        { schema: updateProjectMilestoneSchema, preHandler: [auth, allowAdmin] },
-        updateProjectMilestone
+        {
+            schema: updateProjectMilestoneSchema,
+            preHandler: [auth, allowAdmin],
+        },
+        updateProjectMilestone,
     );
     fastify.delete(
         "/:id/milestones/:milestoneId",
-        { schema: deleteProjectMilestoneSchema, preHandler: [auth, allowAdmin] },
-        deleteProjectMilestone
+        {
+            schema: deleteProjectMilestoneSchema,
+            preHandler: [auth, allowAdmin],
+        },
+        deleteProjectMilestone,
     );
 
     fastify.get(
         "/:id/tasks",
         { schema: listProjectTasksSchema, preHandler: [auth] },
-        listProjectTasks
+        listProjectTasks,
     );
     fastify.post(
         "/:id/tasks",
         { schema: createProjectTaskSchema, preHandler: [auth, allowAdmin] },
-        createProjectTask
+        createProjectTask,
     );
     fastify.put(
         "/:id/tasks/:taskId",
         { schema: updateProjectTaskSchema, preHandler: [auth, allowAdmin] },
-        updateProjectTask
+        updateProjectTask,
     );
     fastify.delete(
         "/:id/tasks/:taskId",
         { schema: deleteProjectTaskSchema, preHandler: [auth, allowAdmin] },
-        deleteProjectTask
+        deleteProjectTask,
     );
 
     fastify.get(
         "/:id/actions",
         { schema: listProjectActionsSchema, preHandler: [auth] },
-        listProjectActions
+        listProjectActions,
     );
     fastify.post(
         "/:id/actions",
         { schema: createProjectActionSchema, preHandler: [auth, allowAdmin] },
-        createProjectAction
+        createProjectAction,
     );
 
     fastify.get(
         "/:id/finances",
         { schema: listProjectFinancesSchema, preHandler: [auth] },
-        listProjectFinances
+        listProjectFinances,
     );
     fastify.post(
         "/:id/finances",
         { schema: createProjectFinanceSchema, preHandler: [auth, allowAdmin] },
-        createProjectFinance
+        createProjectFinance,
     );
     fastify.put(
         "/:id/finances/:financeId",
         { schema: updateProjectFinanceSchema, preHandler: [auth, allowAdmin] },
-        updateProjectFinance
+        updateProjectFinance,
     );
     fastify.delete(
         "/:id/finances/:financeId",
         { schema: deleteProjectFinanceSchema, preHandler: [auth, allowAdmin] },
-        deleteProjectFinance
+        deleteProjectFinance,
     );
 
     fastify.get(
         "/:id/files",
         { schema: listProjectFilesSchema, preHandler: [auth] },
-        listProjectFiles
+        listProjectFiles,
     );
     fastify.post(
         "/:id/files/folder",
         { schema: createProjectFolderSchema, preHandler: [auth, allowAdmin] },
-        createProjectFolder
+        createProjectFolder,
     );
     fastify.post(
         "/:id/files/upload",
         { schema: uploadProjectFileSchema, preHandler: [auth, allowAdmin] },
-        uploadProjectFile
+        uploadProjectFile,
     );
     fastify.get(
         "/:id/files/:fileId/download",
         { schema: downloadProjectFileSchema, preHandler: [auth] },
-        downloadProjectFile
+        downloadProjectFile,
     );
     fastify.delete(
         "/:id/files/:fileId",
         { schema: deleteProjectFileSchema, preHandler: [auth, allowAdmin] },
-        deleteProjectFile
+        deleteProjectFile,
     );
 }

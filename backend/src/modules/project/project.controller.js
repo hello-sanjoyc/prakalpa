@@ -14,16 +14,22 @@ export async function listProjects(req, reply) {
     const sortBy = req.query?.sortBy;
     const sortOrder = req.query?.sortOrder;
     const search = req.query?.search;
+    const member = req.query?.member;
     const includeDeleted = req.query?.includeDeleted;
-    const { rows, total, page: currentPage, limit: pageLimit } =
-        await service.list({
-            page,
-            limit,
-            sortBy,
-            sortOrder,
-            search,
-            includeDeleted,
-        });
+    const {
+        rows,
+        total,
+        page: currentPage,
+        limit: pageLimit,
+    } = await service.list({
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        search,
+        member,
+        includeDeleted,
+    });
     const normalized = rows.map((p) => ({
         ...p,
         department_name: p.department_name || null,
@@ -116,6 +122,16 @@ export async function listProjectMilestones(req, reply) {
     });
 }
 
+export async function listProjectMembers(req, reply) {
+    const service = new ProjectService(req.server?.db);
+    const excludeMemberId = req.query?.exclude_member_id;
+    const members = await service.listMembers({
+        projectId: req.params.id,
+        excludeMemberId,
+    });
+    return reply.send({ members });
+}
+
 export async function createProjectMilestone(req, reply) {
     const service = new ProjectService(req.server?.db);
     const milestone = await service.createMilestone(req.params.id, req.body);
@@ -127,7 +143,7 @@ export async function updateProjectMilestone(req, reply) {
     const milestone = await service.updateMilestone(
         req.params.id,
         req.params.milestoneId,
-        req.body
+        req.body,
     );
     return reply.send({ milestone });
 }
@@ -136,7 +152,7 @@ export async function deleteProjectMilestone(req, reply) {
     const service = new ProjectService(req.server?.db);
     const result = await service.deleteMilestone(
         req.params.id,
-        req.params.milestoneId
+        req.params.milestoneId,
     );
     return reply.send(result);
 }
@@ -185,17 +201,14 @@ export async function updateProjectTask(req, reply) {
     const task = await service.updateTask(
         req.params.id,
         req.params.taskId,
-        req.body
+        req.body,
     );
     return reply.send({ task });
 }
 
 export async function deleteProjectTask(req, reply) {
     const service = new ProjectService(req.server?.db);
-    const result = await service.deleteTask(
-        req.params.id,
-        req.params.taskId
-    );
+    const result = await service.deleteTask(req.params.id, req.params.taskId);
     return reply.send(result);
 }
 
@@ -276,7 +289,7 @@ export async function updateProjectFinance(req, reply) {
     const finance = await service.updateFinance(
         req.params.id,
         req.params.financeId,
-        req.body
+        req.body,
     );
     return reply.send({ finance });
 }
@@ -285,7 +298,7 @@ export async function deleteProjectFinance(req, reply) {
     const service = new ProjectService(req.server?.db);
     const result = await service.deleteFinance(
         req.params.id,
-        req.params.financeId
+        req.params.financeId,
     );
     return reply.send(result);
 }
@@ -333,7 +346,7 @@ export async function createProjectFolder(req, reply) {
     const folder = await service.createProjectFolder(
         req.params.id,
         req.body,
-        req.user?.id || null
+        req.user?.id || null,
     );
     return reply.code(201).send({ folder });
 }
@@ -362,7 +375,7 @@ export async function uploadProjectFile(req, reply) {
         req.params.id,
         filePart,
         fields,
-        req.user?.id || null
+        req.user?.id || null,
     );
     return reply.code(201).send({ file });
 }
@@ -372,7 +385,7 @@ export async function deleteProjectFile(req, reply) {
     const result = await service.softDeleteProjectFile(
         req.params.id,
         req.params.fileId,
-        req.user?.id || null
+        req.user?.id || null,
     );
     return reply.send(result);
 }
@@ -381,16 +394,24 @@ export async function downloadProjectFile(req, reply) {
     const service = new ProjectService(req.server?.db);
     const { file, diskPath } = await service.getProjectFileForDownload(
         req.params.id,
-        req.params.fileId
+        req.params.fileId,
     );
 
-    const baseName = getSafeDownloadName(file.name, file.is_folder ? "folder" : "file");
+    const baseName = getSafeDownloadName(
+        file.name,
+        file.is_folder ? "folder" : "file",
+    );
     reply.header("Cache-Control", "no-store");
 
     if (file.is_folder) {
-        const zipName = baseName.endsWith(".zip") ? baseName : `${baseName}.zip`;
+        const zipName = baseName.endsWith(".zip")
+            ? baseName
+            : `${baseName}.zip`;
         reply.header("Content-Type", "application/zip");
-        reply.header("Content-Disposition", `attachment; filename="${zipName}"`);
+        reply.header(
+            "Content-Disposition",
+            `attachment; filename="${zipName}"`,
+        );
 
         const archive = archiver("zip", { zlib: { level: 9 } });
         archive.on("error", (err) => {
@@ -404,10 +425,7 @@ export async function downloadProjectFile(req, reply) {
         return reply.send(archive);
     }
 
-    reply.header(
-        "Content-Disposition",
-        `attachment; filename="${baseName}"`
-    );
+    reply.header("Content-Disposition", `attachment; filename="${baseName}"`);
     reply.header("Content-Type", file.mime_type || "application/octet-stream");
     return reply.send(createReadStream(diskPath));
 }

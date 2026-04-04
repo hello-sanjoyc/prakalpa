@@ -22,6 +22,8 @@ export const API_ENDPOINTS = {
     ROLE_OPTIONS: `${BASE_URL}/auth/roles/options`,
 
     MEMBERS: `${BASE_URL}/members`,
+    MEMBERS_BY_PROJECT_MEMBER: (memberId) =>
+        `${BASE_URL}/members?project_member=${memberId}`,
     MEMBER_CREATE: `${BASE_URL}/members`,
     MEMBER_EDIT: (memberId) => `${BASE_URL}/members/${memberId}`,
     MEMBER_DELETE: (memberId) => `${BASE_URL}/members/${memberId}`,
@@ -43,14 +45,17 @@ export const API_ENDPOINTS = {
     PROJECT_EDIT: (projectId) => `${BASE_URL}/projects/${projectId}`,
     PROJECT_DELETE: (projectId) => `${BASE_URL}/projects/${projectId}`,
     PROJECT_VIEW: (projectId) => `${BASE_URL}/projects/${projectId}`,
-    PROJECT_MILESTONES: (projectId) => `${BASE_URL}/projects/${projectId}/milestones`,
+    PROJECT_MILESTONES: (projectId) =>
+        `${BASE_URL}/projects/${projectId}/milestones`,
     PROJECT_MILESTONE_UPDATE: (projectId, milestoneId) =>
         `${BASE_URL}/projects/${projectId}/milestones/${milestoneId}`,
     PROJECT_MILESTONE_DELETE: (projectId, milestoneId) =>
         `${BASE_URL}/projects/${projectId}/milestones/${milestoneId}`,
     PROJECT_FILES: (projectId) => `${BASE_URL}/projects/${projectId}/files`,
-    PROJECT_FILES_FOLDER: (projectId) => `${BASE_URL}/projects/${projectId}/files/folder`,
-    PROJECT_FILES_UPLOAD: (projectId) => `${BASE_URL}/projects/${projectId}/files/upload`,
+    PROJECT_FILES_FOLDER: (projectId) =>
+        `${BASE_URL}/projects/${projectId}/files/folder`,
+    PROJECT_FILES_UPLOAD: (projectId) =>
+        `${BASE_URL}/projects/${projectId}/files/upload`,
     PROJECT_FILES_DELETE: (projectId, fileId) =>
         `${BASE_URL}/projects/${projectId}/files/${fileId}`,
     PROJECT_FILES_DOWNLOAD: (projectId, fileId) =>
@@ -61,11 +66,16 @@ export const API_ENDPOINTS = {
     PROJECT_TASK_DELETE: (projectId, taskId) =>
         `${BASE_URL}/projects/${projectId}/tasks/${taskId}`,
     PROJECT_ACTIONS: (projectId) => `${BASE_URL}/projects/${projectId}/actions`,
-    PROJECT_FINANCES: (projectId) => `${BASE_URL}/projects/${projectId}/finances`,
+    PROJECT_MEMBERS: (projectId, excludeMemberId) =>
+        `${BASE_URL}/projects/${projectId}/members${excludeMemberId ? `?exclude_member_id=${excludeMemberId}` : ""}`,
+    PROJECT_FINANCES: (projectId) =>
+        `${BASE_URL}/projects/${projectId}/finances`,
     PROJECT_FINANCE_UPDATE: (projectId, financeId) =>
         `${BASE_URL}/projects/${projectId}/finances/${financeId}`,
     PROJECT_FINANCE_DELETE: (projectId, financeId) =>
         `${BASE_URL}/projects/${projectId}/finances/${financeId}`,
 
     PROJECT_MEMBER_ROLES: `${BASE_URL}/project-member-roles`,
+
+    PROJECT_BY_MEMBER: (memberId) => `${BASE_URL}/projects?member=${memberId}`,
 };

@@ -31,7 +31,7 @@ export default function MemberView() {
             try {
                 const res = await apiRequest(
                     API_ENDPOINTS.MEMBER_VIEW(id),
-                    "GET"
+                    "GET",
                 );
                 if (!isMounted) return;
                 setMember(res?.member || res || null);
@@ -87,8 +87,8 @@ export default function MemberView() {
     const departmentLabel = member.department_name
         ? member.department_name
         : member.department_id
-        ? `Dept #${member.department_id}`
-        : "—";
+          ? `Dept #${member.department_id}`
+          : "—";
     const roleLabel =
         typeof member.role_names === "string" && member.role_names.trim()
             ? member.role_names
@@ -97,12 +97,20 @@ export default function MemberView() {
                   .filter(Boolean)
                   .join(", ")
             : typeof member.role_slugs === "string" && member.role_slugs.trim()
-            ? member.role_slugs
-                  .split(",")
-                  .map((role) => role.trim())
-                  .filter(Boolean)
-                  .join(", ")
-            : "—";
+              ? member.role_slugs
+                    .split(",")
+                    .map((role) => role.trim())
+                    .filter(Boolean)
+                    .join(", ")
+              : "—";
+
+    const statusCounts = member.task_summary?.status || {};
+    const priorityCounts = member.task_summary?.priority || {};
+    const priorityStyles = {
+        LOW: "bg-emerald-500/15 text-emerald-200 border-emerald-400/30",
+        MEDIUM: "bg-amber-500/15 text-amber-200 border-amber-400/30",
+        HIGH: "bg-rose-500/15 text-rose-200 border-rose-400/30",
+    };
 
     return (
         <div className="space-y-6">
@@ -127,22 +135,25 @@ export default function MemberView() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-3">
-            <aside className="space-y-4 rounded-3xl border auth-border auth-surface p-6 auth-shadow bg-gradient-to-br from-white/5 to-white/0">
-                <div className="flex flex-col items-center gap-3">
-                    <div className="h-24 w-24 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center text-3xl font-semibold auth-text-primary border border-white/10">
-                        {member.avatar_path ? (
-                            <img
-                                src={member.avatar_path}
-                                alt={member.full_name || "Member avatar"}
-                                className="h-full w-full object-cover"
-                            />
-                        ) : (
-                            <UserRound size={32} className="text-slate-400" />
-                        )}
-                    </div>
-                    <div className="px-3 py-1 rounded-full text-[11px] font-semibold bg-blue-500/20 text-blue-200">
-                        {member.designation || "Member"}
-                    </div>
+                <aside className="space-y-4 rounded-3xl border auth-border auth-surface p-6 auth-shadow bg-gradient-to-br from-white/5 to-white/0">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="h-24 w-24 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center text-3xl font-semibold auth-text-primary border border-white/10">
+                            {member.avatar_path ? (
+                                <img
+                                    src={member.avatar_path}
+                                    alt={member.full_name || "Member avatar"}
+                                    className="h-full w-full object-cover"
+                                />
+                            ) : (
+                                <UserRound
+                                    size={32}
+                                    className="text-slate-400"
+                                />
+                            )}
+                        </div>
+                        <div className="px-3 py-1 rounded-full text-[11px] font-semibold bg-blue-500/20 text-blue-200">
+                            {member.designation || "Member"}
+                        </div>
                         <h1 className="text-xl font-semibold auth-text-primary">
                             {member.full_name || "Unnamed"}
                         </h1>
@@ -172,7 +183,7 @@ export default function MemberView() {
                         {statCard(
                             "Department",
                             departmentLabel,
-                            <Layers size={18} />
+                            <Layers size={18} />,
                         )}
                         {statCard("Role", roleLabel, <UserRound size={18} />)}
                     </div>
@@ -234,9 +245,6 @@ export default function MemberView() {
                             >
                                 <div className="flex items-center justify-between gap-4">
                                     <div>
-                                        <p className="text-[11px] uppercase tracking-[0.2em] auth-accent">
-                                            Project
-                                        </p>
                                         <p className="text-sm font-semibold auth-text-primary">
                                             {proj.title ||
                                                 `Project #${proj.id}`}
@@ -247,7 +255,6 @@ export default function MemberView() {
                                     </span>
                                 </div>
                                 <div className="mt-2 flex flex-wrap gap-3 text-xs auth-text-secondary">
-                                    <span>Code: {proj.code || "—"}</span>
                                     <span>Role: {proj.role || "Member"}</span>
                                     <Link
                                         to={`/projects/${proj.id}`}
@@ -266,37 +273,55 @@ export default function MemberView() {
                         ) : null}
                     </div>
 
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold auth-text-primary">
-                            Tasks
-                        </h2>
-                    </div>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold auth-text-primary">
+                                Tasks
+                            </h2>
+                        </div>
 
-                    <div className="space-y-4">
-                        {(member.tasks || []).map((task) => (
-                            <div
-                                key={`task-${task.id}`}
-                                className="rounded-2xl border auth-border bg-slate-900/30 p-4"
-                            >
-                                <div className="flex items-center justify-between gap-4">
-                                    <p className="text-sm font-semibold auth-text-primary">
-                                        {task.title || `Task #${task.id}`}
-                                    </p>
-                                    <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-slate-300">
-                                        {task.status || "OPEN"}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="rounded-2xl border auth-border auth-surface p-4 auth-shadow bg-gradient-to-br from-white/5 to-white/0">
+                                <p className="text-[11px] uppercase tracking-[0.2em] auth-accent mb-3">
+                                    Status
+                                </p>
+                                <div className="flex justify-between">
+                                    <span className="text-xs px-2 py-1 rounded-full bg-white/5 text-slate-300">
+                                        Pending: {statusCounts.pending ?? 0}
+                                    </span>
+                                    <span className="text-xs px-2 py-1 rounded-full bg-white/5 text-slate-300">
+                                        In progress:{" "}
+                                        {statusCounts.in_progress ?? 0}
+                                    </span>
+                                    <span className="text-xs px-2 py-1 rounded-full bg-white/5 text-slate-300">
+                                        Complete: {statusCounts.complete ?? 0}
                                     </span>
                                 </div>
-                                <p className="text-xs auth-text-secondary mt-1">
-                                    {task.project_title || "No project linked"}
-                                </p>
                             </div>
-                        ))}
 
-                        {!member.tasks?.length ? (
-                            <div className="rounded-2xl border auth-border bg-slate-900/20 p-6 text-sm auth-text-secondary">
-                                No tasks assigned yet.
+                            <div className="rounded-2xl border auth-border auth-surface p-4 auth-shadow bg-gradient-to-br from-white/5 to-white/0">
+                                <p className="text-[11px] uppercase tracking-[0.2em] auth-accent mb-3">
+                                    Priority
+                                </p>
+                                <div className="flex justify-between">
+                                    <span
+                                        className={`text-xs px-2 py-1 rounded-full border ${priorityStyles.LOW}`}
+                                    >
+                                        Low: {priorityCounts.low ?? 0}
+                                    </span>
+                                    <span
+                                        className={`text-xs px-2 py-1 rounded-full border ${priorityStyles.MEDIUM}`}
+                                    >
+                                        Medium: {priorityCounts.medium ?? 0}
+                                    </span>
+                                    <span
+                                        className={`text-xs px-2 py-1 rounded-full border ${priorityStyles.HIGH}`}
+                                    >
+                                        High: {priorityCounts.high ?? 0}
+                                    </span>
+                                </div>
                             </div>
-                        ) : null}
+                        </div>
                     </div>
                 </section>
             </div>

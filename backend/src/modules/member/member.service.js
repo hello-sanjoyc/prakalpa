@@ -68,6 +68,7 @@ export default class MemberService {
         sortBy = "name",
         sortOrder = "asc",
         search = "",
+        projectMember = null,
     } = {}) {
         const safePage = Math.max(Number(page) || 1, 1);
         const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 200);
@@ -83,6 +84,12 @@ export default class MemberService {
         const orderBy = sortMap[sortBy] || sortMap.name;
         const trimmedSearch = String(search || "").trim();
         const likeSearch = trimmedSearch ? `%${trimmedSearch}%` : null;
+        const extraWhere = [];
+        if (projectMember) {
+            extraWhere.push("pm_self.member_id IS NOT NULL");
+            extraWhere.push("m.id <> :projectMemberId");
+        }
+
         const whereClause = trimmedSearch
             ? `WHERE (
                 m.full_name LIKE :search
@@ -95,9 +102,17 @@ export default class MemberService {
             )`
             : "";
 
-        const rows =
-            (await this.sequelize.query(
-                `
+        const combinedWhere = [whereClause.replace(/^WHERE\s*/i, "").trim()]
+            .filter(Boolean)
+            .concat(extraWhere)
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+        const finalWhereClause = combinedWhere.length
+            ? `WHERE ${combinedWhere.join(" AND ")}`
+            : "";
+
+        const rowsSql = `
             SELECT
                 m.*,
                 u.id AS user_id,
@@ -112,37 +127,49 @@ export default class MemberService {
             LEFT JOIN user_roles ur ON ur.user_id = u.id
             LEFT JOIN roles r ON r.id = ur.role_id 
             LEFT JOIN departments d ON d.id = m.department_id
-            ${whereClause}
+            LEFT JOIN project_members pm ON pm.member_id = m.id
+            LEFT JOIN project_members pm_self ON pm_self.project_id = pm.project_id AND pm_self.member_id = :projectMemberId
+            ${finalWhereClause}
             GROUP BY m.id, u.id
             ORDER BY ${orderBy} ${orderDir}, m.full_name ASC
             LIMIT :limit OFFSET :offset
-            `,
-                {
-                    type: QueryTypes.SELECT,
-                    replacements: {
-                        limit: safeLimit,
-                        offset,
-                        ...(likeSearch ? { search: likeSearch } : {}),
-                    },
-                },
-            )) || [];
+            `;
 
-        const [{ total = 0 } = {}] =
-            (await this.sequelize.query(
-                `
+        const rows =
+            (await this.sequelize.query(rowsSql, {
+                type: QueryTypes.SELECT,
+                replacements: {
+                    limit: safeLimit,
+                    offset,
+                    ...(likeSearch ? { search: likeSearch } : {}),
+                    ...(projectMember
+                        ? { projectMemberId: Number(projectMember) }
+                        : {}),
+                },
+            })) || [];
+
+        const countSql = `
             SELECT COUNT(DISTINCT m.id) AS total
             FROM members m
             LEFT JOIN departments d ON d.id = m.department_id
             LEFT JOIN users u ON u.member_id = m.id AND u.deleted_at IS NULL
             LEFT JOIN user_roles ur ON ur.user_id = u.id
             LEFT JOIN roles r ON r.id = ur.role_id
-            ${whereClause}
-            `,
-                {
-                    type: QueryTypes.SELECT,
-                    replacements: likeSearch ? { search: likeSearch } : {},
+            LEFT JOIN project_members pm ON pm.member_id = m.id
+            LEFT JOIN project_members pm_self ON pm_self.project_id = pm.project_id AND pm_self.member_id = :projectMemberId
+            ${finalWhereClause}
+            `;
+
+        const [{ total = 0 } = {}] =
+            (await this.sequelize.query(countSql, {
+                type: QueryTypes.SELECT,
+                replacements: {
+                    ...(likeSearch ? { search: likeSearch } : {}),
+                    ...(projectMember
+                        ? { projectMemberId: Number(projectMember) }
+                        : {}),
                 },
-            )) || [];
+            })) || [];
 
         return {
             rows: rows.map((row) => this.normalizeAvatarPath(row)),
@@ -153,7 +180,8 @@ export default class MemberService {
     }
 
     async getById(id) {
-        console.log("Member ID: ", id);
+        console.log("Member ID:", id);
+
         const [member] =
             (await this.sequelize.query(
                 `
@@ -167,24 +195,106 @@ export default class MemberService {
                 GROUP_CONCAT(DISTINCT r.slug) AS role_slugs,
                 d.name AS department_name
             FROM members m
-            LEFT JOIN users u ON u.member_id = m.id AND u.deleted_at IS NULL
-            LEFT JOIN user_roles ur ON ur.user_id = u.id
-            LEFT JOIN roles r ON r.id = ur.role_id 
-            LEFT JOIN departments d ON d.id = m.department_id
+            LEFT JOIN users u
+                ON u.member_id = m.id
+                AND u.deleted_at IS NULL
+            LEFT JOIN user_roles ur
+                ON ur.user_id = u.id
+            LEFT JOIN roles r
+                ON r.id = ur.role_id
+            LEFT JOIN departments d
+                ON d.id = m.department_id
             WHERE m.id = :id
-            GROUP BY m.id, u.id
+            GROUP BY
+                m.id,
+                u.id,
+                d.name
             LIMIT 1
             `,
-                { type: QueryTypes.SELECT, replacements: { id } },
+                {
+                    type: QueryTypes.SELECT,
+                    replacements: { id },
+                },
             )) || [];
 
-        console.log("Fetched Member: ", member);
         if (!member) {
             const err = new Error("Member not found");
             err.statusCode = 404;
             throw err;
         }
-        return this.normalizeAvatarPath(member);
+
+        // Projects
+        const projects =
+            (await this.sequelize.query(
+                `
+            SELECT
+                p.id AS project_id,
+                p.title AS project_name,
+                pm.role AS project_role
+            FROM project_members pm
+            INNER JOIN projects p
+                ON p.id = pm.project_id
+            WHERE pm.member_id = :id
+              AND p.deleted_at IS NULL
+            ORDER BY p.title ASC
+            `,
+                {
+                    type: QueryTypes.SELECT,
+                    replacements: { id },
+                },
+            )) || [];
+
+        // Task Summary (aligned with your actual schema: PENDING / IN_PROGRESS / COMPLETE)
+        const [taskStats] =
+            (await this.sequelize.query(
+                `
+            SELECT
+                COUNT(*) AS total_tasks,
+
+                SUM(CASE WHEN t.status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count,
+                SUM(CASE WHEN t.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS in_progress_count,
+                SUM(CASE WHEN t.status = 'COMPLETE' THEN 1 ELSE 0 END) AS complete_count,
+
+                SUM(CASE WHEN t.priority = 'LOW' THEN 1 ELSE 0 END) AS low_priority_count,
+                SUM(CASE WHEN t.priority = 'MEDIUM' THEN 1 ELSE 0 END) AS medium_priority_count,
+                SUM(CASE WHEN t.priority = 'HIGH' THEN 1 ELSE 0 END) AS high_priority_count
+
+            FROM tasks t
+            WHERE t.owner_id = :id
+              AND t.deleted_at IS NULL
+            `,
+                {
+                    type: QueryTypes.SELECT,
+                    replacements: { id },
+                },
+            )) || [];
+
+        const normalizedMember = this.normalizeAvatarPath(member);
+
+        normalizedMember.projects = projects.map((project) => ({
+            id: project.project_id,
+            title: project.project_name,
+            role: project.project_role,
+        }));
+
+        // Attach Summary (no task list anymore)
+        normalizedMember.task_summary = {
+            total: Number(taskStats?.total_tasks || 0),
+
+            status: {
+                pending: Number(taskStats?.pending_count || 0),
+                in_progress: Number(taskStats?.in_progress_count || 0),
+                complete: Number(taskStats?.complete_count || 0),
+            },
+
+            priority: {
+                low: Number(taskStats?.low_priority_count || 0),
+                medium: Number(taskStats?.medium_priority_count || 0),
+                high: Number(taskStats?.high_priority_count || 0),
+            },
+        };
+
+        return normalizedMember;
     }
 
     async create(payload, avatarFile = null) {

@@ -58,8 +58,20 @@ export async function listMembers(req, reply) {
     const sortBy = req.query?.sortBy;
     const sortOrder = req.query?.sortOrder;
     const search = req.query?.search;
-    const { rows, total, page: currentPage, limit: pageLimit } =
-        await service.list({ page, limit, sortBy, sortOrder, search });
+    const projectMember = req.query?.project_member;
+    const {
+        rows,
+        total,
+        page: currentPage,
+        limit: pageLimit,
+    } = await service.list({
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        search,
+        projectMember,
+    });
     if (!rows || rows.length === 0) {
         return reply.send({
             members: [],
