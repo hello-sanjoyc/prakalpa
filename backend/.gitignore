@@ -1,0 +1,16 @@
+# Logs
+logs
+*.log
+
+node_modules
+db
+sql
+
+# Keep environment variables out of version control
+.env
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
