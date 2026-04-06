@@ -1,61 +1,71 @@
 import React from "react";
+import { useOutletContext } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import usePageTitle from "../lib/usePageTitle";
 
 const heroHighlights = [
-    { title: "Project DNA", desc: "OKRs, roadmaps, and epics in one place." },
     {
-        title: "Team heartbeat",
-        desc: "Capacity-aware sprints with live health.",
+        title: "Projects",
+        desc: "Track project lifecycle, milestones, files, and finances.",
     },
     {
-        title: "Smart billing",
-        desc: "Time, expenses, and invoices stay in sync.",
+        title: "Tasks",
+        desc: "Filter by status, priority, assignee, and project in one workspace.",
+    },
+    {
+        title: "People",
+        desc: "Manage members and departments with role-aware access.",
     },
 ];
 
 const featureCards = [
     {
-        title: "Unified workspace",
-        desc: "Boards, timelines, docs, and approvals stitched together so teams never lose context.",
-        badge: "Plan",
+        title: "Operational dashboard",
+        desc: "Live KPIs for projects, task load, due dates, file activity, and budget burn.",
+        badge: "Overview",
     },
     {
-        title: "Execution clarity",
-        desc: "Status by owner, risk, and effort with rollups for programs and portfolios.",
-        badge: "Track",
+        title: "Portfolio visibility",
+        desc: "Use the projects dashboard to monitor health, priorities, and execution at scale.",
+        badge: "Portfolio",
     },
     {
-        title: "Collaboration engine",
-        desc: "Comments, decisions, and handoffs live beside the work—not buried in chat history.",
-        badge: "Collaborate",
+        title: "Team structure",
+        desc: "Members and departments stay connected to ownership, permissions, and delivery flow.",
+        badge: "People",
     },
     {
-        title: "Governance ready",
-        desc: "Audit-ready history, controls by role, and templates that enforce how your org ships.",
-        badge: "Control",
+        title: "Role-based controls",
+        desc: "Admin console access is restricted by role while regular users keep focus on delivery.",
+        badge: "Access",
     },
 ];
 
 const modules = [
     {
-        name: "Projects & Portfolios",
-        desc: "Set outcomes, map milestones, and give leadership a crisp pulse.",
-        tag: "Strategy",
+        name: "Dashboard",
+        desc: "Cross-module summary of project health, task status, workload, files, and finance signals.",
+        tag: "Core",
+        href: "/dashboard",
     },
     {
-        name: "Tasks & Sprints",
-        desc: "Velocity-aware planning, WIP limits, and automation for repetitive work.",
+        name: "Projects",
+        desc: "Create, view, and update projects with milestones, actions, tasks, and supporting files.",
+        tag: "Execution",
+        href: "/projects",
+    },
+    {
+        name: "Tasks",
+        desc: "Monitor work by tabbed status views and apply project/member/priority filters quickly.",
         tag: "Delivery",
+        href: "/tasks",
     },
     {
-        name: "Documents & Decisions",
-        desc: "Lightweight briefs, meeting notes, and approvals tied directly to tasks.",
-        tag: "Knowledge",
-    },
-    {
-        name: "Clients & Billing",
-        desc: "Track time, expenses, and invoice states across retainers or fixed-fee work.",
-        tag: "Revenue",
+        name: "Members & Departments",
+        desc: "Maintain people records and organizational structure used by project and dashboard views.",
+        tag: "Directory",
+        href: "/members",
     },
 ];
 
@@ -80,16 +90,16 @@ const workflow = [
 
 const faqs = [
     {
-        q: "How close is this to the reference?",
-        a: "The layout mirrors the sections of the Taskly showcase—hero, value props, modules, and FAQ—while using this project's visual system.",
+        q: "Which modules are currently available?",
+        a: "Dashboard, Projects, Project Portfolio Dashboard, Tasks, Members, Departments, and an Admin Console route.",
     },
     {
-        q: "Can we connect to our API?",
-        a: "Yes. Point `VITE_API_BASE_URL` in `.env` to your backend to hydrate stats, projects, and billing data.",
+        q: "Can users open these modules directly from this homepage?",
+        a: "Yes. The feature cards below link to active routes so users can jump straight into the portal.",
     },
     {
         q: "Does it support role-based views?",
-        a: "The UI honors the existing auth context; add guards per section if you need role-specific content.",
+        a: "Yes. Access is role-aware through auth context, with admin-only behavior on the Admin page.",
     },
     {
         q: "Is the layout responsive?",
@@ -139,6 +149,18 @@ function Card({ children }) {
 export default function Home() {
     usePageTitle("Home");
     const appName = import.meta.env.VITE_APP_NAME || "PMS";
+    const { openContactModal } = useOutletContext();
+    const location = useLocation();
+
+    React.useEffect(() => {
+        const hash = String(location.hash || "").replace("#", "");
+        if (!hash) return;
+        const target = document.getElementById(hash);
+        if (!target) return;
+        requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    }, [location.hash]);
 
     return (
         <div className="relative overflow-hidden">
@@ -154,13 +176,12 @@ export default function Home() {
                         </div>
                         <div className="space-y-4">
                             <h1 className="text-4xl font-bold leading-tight text-white md:text-5xl">
-                                Ship every project with confidence using{" "}
-                                {appName}
+                                Manage delivery with confidence in {appName}
                             </h1>
                             <p className="text-lg text-slate-200 md:text-xl">
-                                Inspired by Taskly’s showcase—rebuilt for this
-                                product. Capture strategy, execution, and
-                                billing in one calm workspace teams love.
+                                One portal for dashboard tracking, projects,
+                                tasks, members, and departments. Navigate
+                                quickly to the exact module you need.
                             </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-4">
@@ -170,12 +191,13 @@ export default function Home() {
                             >
                                 Explore modules
                             </a>
-                            <a
-                                href="#demo"
+                            <button
+                                type="button"
+                                onClick={openContactModal}
                                 className="rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:border-white/40"
                             >
-                                See live workspace
-                            </a>
+                                Contact us
+                            </button>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-3">
                             {heroHighlights.map((item, idx) => (
@@ -202,7 +224,7 @@ export default function Home() {
                                         Health pulse
                                     </p>
                                     <h3 className="text-2xl font-semibold text-white mt-1">
-                                        Programs dashboard
+                                        Portal dashboard
                                     </h3>
                                 </div>
                                 <div className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-emerald-200">
@@ -210,7 +232,7 @@ export default function Home() {
                                 </div>
                             </div>
                             <div className="mt-6 space-y-4">
-                                {["Delivery", "Risks", "Billing"].map(
+                                {["Projects", "Tasks", "Members"].map(
                                     (row, i) => (
                                         <div
                                             key={row}
@@ -234,8 +256,8 @@ export default function Home() {
                                                         {i === 0
                                                             ? "8/9 milestones"
                                                             : i === 1
-                                                              ? "Low"
-                                                              : "Invoiced"}
+                                                              ? "42 open"
+                                                              : "18 active"}
                                                     </span>
                                                 </div>
                                                 <div className="mt-2 h-2 rounded-full bg-white/5">
@@ -287,10 +309,10 @@ export default function Home() {
                 <SectionTitle
                     eyebrow="Built for modern PMOs"
                     title="Every pillar of project tracking in one place"
-                    subtitle="Reference-ready cards mirror the Taskly layout: modules, value props, and quick cues your stakeholders expect."
+                    subtitle="Each card maps to a live portal module so navigation reflects what users can use today."
                 />
                 <div className="mt-10 grid gap-6 md:grid-cols-2">
-                    {modules.map((mod, idx) => (
+                    {modules.map((mod) => (
                         <div
                             key={mod.name}
                             className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-6"
@@ -306,9 +328,15 @@ export default function Home() {
                                 <p className="mt-2 text-sm text-slate-200">
                                     {mod.desc}
                                 </p>
-                                <div className="mt-4 flex items-center gap-2 text-xs text-amber-100">
+                                <div className="mt-4 flex items-center justify-between gap-2 text-xs text-amber-100">
+                                    <Link
+                                        to={mod.href}
+                                        className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:border-white/40"
+                                    >
+                                        Open module
+                                    </Link>
                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                                    Ready-made templates and views
+                                    Live route available
                                 </div>
                             </div>
                         </div>
@@ -323,7 +351,7 @@ export default function Home() {
                 <SectionTitle
                     eyebrow="Why teams choose this"
                     title="Clarity for leaders, calm for builders"
-                    subtitle="From idea to invoice, every section is mapped to the Taskly-style story: simple, confident, and outcome-led."
+                    subtitle="From planning to execution, the portal keeps project data, task flow, and team ownership connected."
                 />
                 <div className="mt-10 grid gap-6 md:grid-cols-2">
                     {featureCards.map((feature) => (
@@ -353,7 +381,7 @@ export default function Home() {
                 <SectionTitle
                     eyebrow="Delivery rhythm"
                     title="A four-beat workflow the whole org understands"
-                    subtitle="Keep the same cadence as the reference site: shape, plan, deliver, measure—each step with crisp, visual cues."
+                    subtitle="Run a reliable cycle from project setup to measurable execution across teams."
                 />
                 <div className="mt-10 grid gap-6 md:grid-cols-[1fr,1.2fr]">
                     <div className="space-y-4">
@@ -398,10 +426,10 @@ export default function Home() {
                         </div>
                         <div className="mt-6 space-y-3">
                             {[
-                                "Backlog",
-                                "In progress",
-                                "Review",
-                                "Blocked",
+                                "Project intake",
+                                "Task execution",
+                                "Member alignment",
+                                "Department tracking",
                             ].map((column, idx) => (
                                 <div
                                     key={column}
@@ -416,10 +444,12 @@ export default function Home() {
                                         </div>
                                         <span className="text-xs text-slate-200">
                                             {idx === 0
-                                                ? "12 cards"
+                                                ? "24 projects"
                                                 : idx === 1
-                                                  ? "9 cards"
-                                                  : "3 cards"}
+                                                  ? "42 tasks"
+                                                  : idx === 2
+                                                    ? "18 members"
+                                                    : "6 units"}
                                         </span>
                                     </div>
                                     <div className="mt-2 flex items-center gap-2 text-xs text-slate-200">
@@ -466,7 +496,7 @@ export default function Home() {
                 <SectionTitle
                     eyebrow="Answers"
                     title="FAQs your buyers actually ask"
-                    subtitle="Drop these into your sales deck or docs—the wording mirrors the Taskly page but is tuned to this stack."
+                    subtitle="Key details about currently available modules and access behavior."
                 />
                 <div className="mt-10 grid gap-6 md:grid-cols-2">
                     {faqs.map((item) => (
@@ -493,24 +523,19 @@ export default function Home() {
                                 Ready to roll this out?
                             </h3>
                             <p className="text-slate-200">
-                                Use the CTA structure from the reference page:
-                                one tap to start, one tap to talk. No more
-                                wandering home screens.
+                                Jump directly to login and start using
+                                dashboard, projects, tasks, and people modules
+                                from a single navigation flow.
                             </p>
                         </div>
                         <div className="flex flex-wrap gap-3">
-                            <a
-                                href="#"
-                                className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-white/30 transition hover:-translate-y-0.5"
-                            >
-                                Get started now
-                            </a>
-                            <a
-                                href="#features"
+                            <button
+                                type="button"
+                                onClick={openContactModal}
                                 className="rounded-full border border-white/30 px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:border-white/60"
                             >
-                                See features
-                            </a>
+                                Contact
+                            </button>
                         </div>
                     </div>
                 </div>

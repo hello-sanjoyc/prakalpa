@@ -292,6 +292,17 @@ CREATE TABLE rag_history (
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
+CREATE TABLE contact_inquiries (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  organization_name VARCHAR(255) NOT NULL,
+  phone_number VARCHAR(20) NOT NULL,
+  email_address VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 -- Indexing and performance notes
 CREATE INDEX idx_projects_department ON projects(department_id);
 CREATE INDEX idx_tasks_owner ON tasks(owner_id);

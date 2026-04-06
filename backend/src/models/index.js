@@ -1,6 +1,7 @@
 import defineAction from "./action.model.js";
 import defineApproval from "./approval.model.js";
 import defineAuditLog from "./audit-log.model.js";
+import defineContactInquiry from "./contact-inquiry.model.js";
 import defineDepartment from "./department.model.js";
 import defineMember from "./member.model.js";
 import defineMilestone from "./milestone.model.js";
@@ -24,6 +25,7 @@ export function initModels(sequelize) {
     const Action = defineAction(sequelize);
     const Approval = defineApproval(sequelize);
     const AuditLog = defineAuditLog(sequelize);
+    const ContactInquiry = defineContactInquiry(sequelize);
     const Department = defineDepartment(sequelize);
     const Member = defineMember(sequelize);
     const Milestone = defineMilestone(sequelize);
@@ -177,6 +179,7 @@ export function initModels(sequelize) {
         Action,
         Approval,
         AuditLog,
+        ContactInquiry,
         Department,
         Member,
         Milestone,

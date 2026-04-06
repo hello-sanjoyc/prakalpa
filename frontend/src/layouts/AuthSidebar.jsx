@@ -1,17 +1,23 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
-const navItems = [
+const baseNavItems = [
     { to: "/dashboard", label: "Dashboard" },
     { to: "/projects", label: "Projects" },
-    /*     { to: "/projects/dashboard", label: "Portfolio" }, */
+    { to: "/projects/dashboard", label: "Portfolio" },
     { to: "/tasks", label: "Tasks" },
-    /*     { to: "/chart", label: "Charts" }, */
     { to: "/members", label: "Members" },
     { to: "/departments", label: "Departments" },
 ];
 
 export default function AuthSidebar({ isMobile = false, onClose = () => {} }) {
+    const { role } = useAuth();
+    const navItems =
+        role === "admin"
+            ? [...baseNavItems, { to: "/admin", label: "Admin" }]
+            : baseNavItems;
+
     const containerClasses = isMobile
         ? "flex h-full w-full flex-col"
         : "hidden w-72 min-w-[18rem] xl:flex xl:flex-col";

@@ -13,6 +13,7 @@ import projectMemberRoleRoutes from "./modules/project-member-role/project-membe
 import departmentRoutes from "./modules/department/department.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
 import healthRoutes from "./modules/health/health.routes.js";
+import contactRoutes from "./modules/contact/contact.routes.js";
 
 import { errorHandler } from "./lib/errors/error-handler.js";
 
@@ -36,6 +37,7 @@ export async function buildApp(opts = {}) {
     await app.register(projectMemberRoleRoutes, { prefix: "/api/project-member-roles" });
     await app.register(departmentRoutes, { prefix: "/api/departments" });
     await app.register(dashboardRoutes, { prefix: "/api/dashboard" });
+    await app.register(contactRoutes, { prefix: "/api/contact" });
 
     app.setErrorHandler(errorHandler);
 

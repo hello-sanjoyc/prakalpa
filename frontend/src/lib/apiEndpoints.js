@@ -77,6 +77,7 @@ export const API_ENDPOINTS = {
 
     PROJECT_MEMBER_ROLES: `${BASE_URL}/project-member-roles`,
     DASHBOARD_OVERVIEW: `${BASE_URL}/dashboard`,
+    CONTACT_US: `${BASE_URL}/contact`,
 
     PROJECT_BY_MEMBER: (memberId) => `${BASE_URL}/projects?member=${memberId}`,
     TASKS_DASHBOARD: `${BASE_URL}/projects/tasks/dashboard`,
