@@ -2,8 +2,8 @@ import buildApp from "./app.js";
 import { env } from "./config/index.js";
 import { setupGracefulShutdown } from "./bootstrap/graceful-shutdown.js";
 
-const PORT = Number(env.PORT) || 4000;
-const HOST = "0.0.0.0";
+const PORT = Number(env.PORT) || 4005;
+const HOST = "127.0.0.1";
 
 async function start() {
     const app = await buildApp();
